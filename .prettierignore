@@ -1,0 +1,4 @@
+node_modules/
+SwiftExplorerApp/.build/
+coverage/
+*.vsix

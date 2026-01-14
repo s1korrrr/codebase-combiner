@@ -1,0 +1,168 @@
+{
+  "name": "codebase-combiner",
+  "displayName": "Codebase Combiner",
+  "description": "Combine an entire workspace or a specific folder into one Markdown or text file with configurable filters.",
+  "version": "0.0.1",
+  "license": "MIT",
+  "publisher": "mrsikorarafal@gmail.com",
+  "author": "Rafal Sikora",
+  "icon": "assets/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/s1korrrr/codebase-combiner.git"
+  },
+  "bugs": {
+    "url": "https://github.com/s1korrrr/codebase-combiner/issues"
+  },
+  "homepage": "https://github.com/s1korrrr/codebase-combiner#readme",
+  "keywords": [
+    "codebase",
+    "combiner",
+    "prompt",
+    "vscode",
+    "extension",
+    "markdown",
+    "tokens",
+    "llm"
+  ],
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:codebaseCombiner.combineWorkspace",
+    "onCommand:codebaseCombiner.combineFolder"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "codebaseCombiner.combineWorkspace",
+        "category": "Codebase Combiner",
+        "title": "Combine Workspace to Single File"
+      },
+      {
+        "command": "codebaseCombiner.combineFolder",
+        "category": "Codebase Combiner",
+        "title": "Combine This Folder to Single File"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "codebaseCombiner.combineFolder",
+          "when": "explorerResourceIsFolder || explorerResourceIsFile",
+          "group": "navigation@9"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "codebaseCombiner.combineWorkspace",
+          "when": "true"
+        },
+        {
+          "command": "codebaseCombiner.combineFolder",
+          "when": "true"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Codebase Combiner",
+      "properties": {
+        "codebaseCombiner.outputFormat": {
+          "type": "string",
+          "enum": [
+            "txt",
+            "md"
+          ],
+          "default": "txt",
+          "description": "Output format: plain text or Markdown."
+        },
+        "codebaseCombiner.outputFileName": {
+          "type": "string",
+          "default": "combined_code.txt",
+          "description": "File name for the combined output placed in the chosen root."
+        },
+        "codebaseCombiner.includeGlobs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "**/*"
+          ],
+          "description": "Glob patterns to include (relative to the chosen root)."
+        },
+        "codebaseCombiner.excludeGlobs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "**/node_modules/**",
+            "**/.git/**",
+            "**/.vscode/**",
+            "**/dist/**",
+            "**/build/**"
+          ],
+          "description": "Glob patterns to exclude."
+        },
+        "codebaseCombiner.includeExtensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Optional allow-list of file extensions (e.g. ['js','ts']). If empty, all extensions are allowed unless restricted by includeGlobs/useExtensionsFilter."
+        },
+        "codebaseCombiner.excludeExtensions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "png",
+            "jpg",
+            "jpeg",
+            "gif",
+            "mp4",
+            "zip",
+            "bin",
+            "lock"
+          ],
+          "description": "Extensions to always exclude (without leading dots)."
+        },
+        "codebaseCombiner.maxFileSizeKB": {
+          "type": "number",
+          "default": 512,
+          "description": "Skip files larger than this size (in kilobytes)."
+        },
+        "codebaseCombiner.useExtensionsFilter": {
+          "type": "boolean",
+          "default": true,
+          "description": "If true, derive an allow-list of extensions from includeGlobs and skip other extensions when the list is non-empty."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "mocha",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "minimatch": "^9.0.5"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.7.1",
+    "chai": "^4.4.1",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "mocha": "^10.4.0",
+    "prettier": "^3.3.3"
+  }
+}

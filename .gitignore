@@ -1,0 +1,13 @@
+.DS_Store
+.vscode/
+node_modules/
+SwiftExplorerApp/.build/
+*.vsix
+*.log
+*.swp
+*.swo
+coverage/
+AGENTS.md
+PLAN.md
+TODO.md
+MEMORY.md
