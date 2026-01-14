@@ -10,6 +10,9 @@ All notable changes to this project will be documented in this file.
 - ESLint/Prettier and SwiftFormat configuration.
 - CI workflow for linting, formatting, and tests.
 - Open-source documentation (README, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY).
+- GitHub issue templates and PR template.
+- README preview image and badges.
+- VS Code packaging rules via `.vscodeignore`.
 
 ## [0.0.1] - 2026-01-14
 
