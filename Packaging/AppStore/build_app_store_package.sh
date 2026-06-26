@@ -87,6 +87,7 @@ ICONSET_DIR="$DIST_DIR/AppIcon.iconset"
 RELEASE_BINARY="$PACKAGE_DIR/.build/release/$EXECUTABLE_NAME"
 ENTITLEMENTS="$PACKAGING_DIR/AppStore.entitlements"
 INFO_TEMPLATE="$PACKAGING_DIR/Info.plist.in"
+PRIVACY_MANIFEST="$PACKAGING_DIR/PrivacyInfo.xcprivacy"
 INFO_PLIST="$APP_PATH/Contents/Info.plist"
 ICON_SOURCE="$ROOT_DIR/assets/icon.jpg"
 
@@ -182,6 +183,7 @@ cp "$RELEASE_BINARY" "$APP_PATH/Contents/MacOS/$EXECUTABLE_NAME"
 chmod 755 "$APP_PATH/Contents/MacOS/$EXECUTABLE_NAME"
 render_info_plist
 make_icon
+cp "$PRIVACY_MANIFEST" "$APP_PATH/Contents/Resources/PrivacyInfo.xcprivacy"
 
 if [[ -n "$PROVISIONING_PROFILE" ]]; then
   if [[ ! -f "$PROVISIONING_PROFILE" ]]; then

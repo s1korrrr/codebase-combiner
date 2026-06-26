@@ -11,6 +11,7 @@ This folder contains the Mac App Store packaging path for the SwiftPM macOS app.
 - Minimum macOS: `13.0`
 - Category: `public.app-category.developer-tools`
 - Entitlements: App Sandbox plus user-selected file read/write access.
+- Privacy manifest: declares no tracking, no collected data, and UserDefaults access for app settings.
 
 ## Local validation
 

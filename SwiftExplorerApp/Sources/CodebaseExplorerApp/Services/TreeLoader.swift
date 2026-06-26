@@ -45,10 +45,9 @@ struct TreeLoader {
                 if excludeList.contains(ext) { return nil }
                 if !allowList.isEmpty, !allowList.contains(ext) { return nil }
 
-                guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
-                      let size = attrs[.size] as? NSNumber else { return nil }
+                guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize else { return nil }
 
-                if size.intValue > maxFileSizeKB * 1024 { return nil }
+                if size > maxFileSizeKB * 1024 { return nil }
 
                 guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { return nil }
                 if isBinary(data: data) { return nil }
@@ -63,7 +62,7 @@ struct TreeLoader {
                     isDirectory: false,
                     children: [],
                     tokenCount: tokens,
-                    sizeBytes: size.intValue,
+                    sizeBytes: size,
                     content: text
                 )
             }
