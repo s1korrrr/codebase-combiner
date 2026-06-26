@@ -27,34 +27,31 @@ struct FiltersView: View {
                 .help("Open filter editor")
             }
 
-            HStack(alignment: .top, spacing: 14) {
-                filterField(
-                    title: "Include",
-                    placeholder: "swift,js,ts,tsx,jsx,md,txt,py",
-                    text: $allowList
-                )
-                .frame(minWidth: 220)
+            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 12) {
+                GridRow(alignment: .bottom) {
+                    filterField(
+                        title: "Include",
+                        placeholder: "swift,js,ts,tsx,jsx,md,txt,py",
+                        text: $allowList
+                    )
 
-                filterField(
-                    title: "Exclude",
-                    placeholder: "png,jpg,jpeg,gif,mp4,zip,bin,lock",
-                    text: $excludeList
-                )
-                .frame(minWidth: 220)
+                    filterField(
+                        title: "Exclude",
+                        placeholder: "png,jpg,jpeg,gif,mp4,zip,bin,lock",
+                        text: $excludeList
+                    )
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Toggle("Skip hidden files", isOn: $skipHidden)
-                        .toggleStyle(.switch)
-                    Button(action: onApply) {
-                        Label("Apply", systemImage: "checkmark")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .keyboardShortcut(.return, modifiers: [.command])
+                    filterActions
                 }
-                .frame(minWidth: 150, alignment: .leading)
-            }
 
-            sizeCard
+                GridRow(alignment: .bottom) {
+                    sizeCard
+                        .gridCellColumns(2)
+
+                    Color.clear
+                        .frame(width: 210, height: 1)
+                }
+            }
 
             Text("Filters auto-apply after a short pause. Use Apply for an immediate refresh.")
                 .font(.caption)
@@ -90,17 +87,19 @@ struct FiltersView: View {
                     onApply()
                 }
                 .onChange(of: text.wrappedValue) { _ in scheduleApply() }
+                .frame(minWidth: 220)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var sizeCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 7) {
             Text("Max file size")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 Slider(value: $maxFileSizeKB, in: 32 ... 8192, step: 32)
-                    .frame(width: 200)
+                    .frame(minWidth: 220)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(Int(maxFileSizeKB)) KB")
                         .font(.headline.monospacedDigit())
@@ -113,9 +112,32 @@ struct FiltersView: View {
                 TextField("KB", value: $maxFileSizeKB, format: .number)
                     .frame(width: 70)
                     .textFieldStyle(.roundedBorder)
+                Spacer(minLength: 0)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var filterActions: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Text("Skip hidden files")
+                    .lineLimit(1)
+                Spacer(minLength: 10)
+                Toggle("Skip hidden files", isOn: $skipHidden)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+            }
+            .frame(height: 24)
+
+            Button(action: onApply) {
+                Label("Apply", systemImage: "checkmark")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .keyboardShortcut(.return, modifiers: [.command])
+        }
+        .frame(width: 210, alignment: .leading)
     }
 
     // MARK: - Helpers

@@ -42,7 +42,7 @@ struct ContentView: View {
 
             mainContent
         }
-        .frame(minWidth: 1100, minHeight: 760)
+        .frame(minWidth: 1280, minHeight: 820)
         .overlay(alignment: .topTrailing) {
             if showToast {
                 copyToast
@@ -136,53 +136,67 @@ struct ContentView: View {
 
     private var controlBar: some View {
         HStack(spacing: 8) {
-            actionButton("Choose", systemImage: "folder", action: pickFolder)
-                .keyboardShortcut("o", modifiers: [.command])
+            HStack(spacing: 8) {
+                actionButton("Choose", systemImage: "folder", action: pickFolder)
+                    .keyboardShortcut("o", modifiers: [.command])
 
-            actionButton("Refresh", systemImage: "arrow.clockwise", action: reloadTree)
-                .disabled(rootURL == nil || isLoading)
-                .keyboardShortcut("r", modifiers: [.command])
-
-            Divider()
-                .frame(height: 20)
-
-            actionButton("All", systemImage: "checkmark.circle", action: selectAll)
-                .disabled(rootNode == nil)
-            actionButton("Clear", systemImage: "xmark.circle", action: clearSelection)
-                .disabled(selectedIDs.isEmpty)
-
-            Divider()
-                .frame(height: 20)
-
-            Button(action: copyCombined) {
-                Label("Copy", systemImage: "doc.on.doc")
+                actionButton("Refresh", systemImage: "arrow.clockwise", action: reloadTree)
+                    .disabled(rootURL == nil || isLoading)
+                    .keyboardShortcut("r", modifiers: [.command])
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.regular)
-            .disabled(selectedFileNodes.isEmpty)
-            .keyboardShortcut("c", modifiers: [.command, .shift])
+            .frame(minWidth: 220, alignment: .leading)
 
-            actionButton("Save", systemImage: "square.and.arrow.down", action: saveCombined)
+            Divider()
+                .frame(height: 20)
+
+            HStack(spacing: 8) {
+                actionButton("All", systemImage: "checkmark.circle", action: selectAll)
+                    .disabled(rootNode == nil)
+                actionButton("Clear", systemImage: "xmark.circle", action: clearSelection)
+                    .disabled(selectedIDs.isEmpty)
+            }
+            .frame(width: 154, alignment: .leading)
+
+            Divider()
+                .frame(height: 20)
+
+            HStack(spacing: 8) {
+                Button(action: copyCombined) {
+                    Label("Copy", systemImage: "doc.on.doc")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
                 .disabled(selectedFileNodes.isEmpty)
-                .keyboardShortcut("s", modifiers: [.command])
+                .keyboardShortcut("c", modifiers: [.command, .shift])
+
+                actionButton("Save", systemImage: "square.and.arrow.down", action: saveCombined)
+                    .disabled(selectedFileNodes.isEmpty)
+                    .keyboardShortcut("s", modifiers: [.command])
+            }
+            .frame(width: 176, alignment: .leading)
 
             Spacer()
 
-            Picker("Output", selection: $outputMarkdown) {
-                Text("Markdown").tag(true)
-                Text("Plain Text").tag(false)
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 170)
-            .labelsHidden()
+            HStack(spacing: 10) {
+                Picker("Output", selection: $outputMarkdown) {
+                    Text("Markdown").tag(true)
+                    Text("Plain Text").tag(false)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 170)
+                .labelsHidden()
 
-            Toggle(isOn: $showFilters) {
-                Label("Filters", systemImage: "line.3.horizontal.decrease.circle")
+                Toggle(isOn: $showFilters) {
+                    Label("Filters", systemImage: "line.3.horizontal.decrease.circle")
+                }
+                .toggleStyle(.button)
+                .frame(width: 96)
+                .help("Show filters")
             }
-            .toggleStyle(.button)
-            .help("Show filters")
+            .frame(width: 276, alignment: .trailing)
         }
         .padding(10)
+        .frame(minHeight: 50)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .hoverLift()
     }
@@ -613,9 +627,10 @@ struct CodebaseExplorerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        WindowGroup {
+        WindowGroup("Codebase Combiner") {
             ContentView()
         }
+        .defaultSize(width: 1280, height: 820)
         .windowResizability(.contentSize)
         .commands {
             CommandMenu("Support") {
@@ -641,5 +656,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Ensure the app accepts keyboard input even when launched as a plain executable.
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
+        DispatchQueue.main.async { self.recenterOffscreenWindowsIfNeeded() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.recenterOffscreenWindowsIfNeeded() }
+    }
+
+    @MainActor
+    private func recenterOffscreenWindowsIfNeeded() {
+        for window in NSApp.windows where window.isVisible {
+            guard !window.frame.isEmpty else { continue }
+            let isVisible = NSScreen.screens.contains { $0.visibleFrame.intersects(window.frame) }
+            if !isVisible, let screen = NSScreen.main {
+                window.setFrameOrigin(CGPoint(
+                    x: screen.visibleFrame.midX - window.frame.width / 2,
+                    y: screen.visibleFrame.midY - window.frame.height / 2
+                ))
+            }
+        }
     }
 }

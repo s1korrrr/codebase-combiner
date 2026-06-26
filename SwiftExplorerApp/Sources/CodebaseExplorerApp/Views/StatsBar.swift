@@ -13,7 +13,6 @@ struct StatsBar: View {
             stat(label: "Files", value: "\(selectedFiles)/\(totalFiles)", systemImage: "doc.text")
             stat(label: "Tokens", value: "\(tokenCount)", systemImage: "number")
             stat(label: "Size", value: ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file), systemImage: "internaldrive")
-            Spacer()
         }
         .padding(10)
         .appSurface(cornerRadius: 12)
@@ -40,6 +39,7 @@ struct StatsBar: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
         .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .frame(maxWidth: .infinity, alignment: .leading)
         .hoverLift()
     }
 }
