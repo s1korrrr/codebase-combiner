@@ -77,6 +77,12 @@ Output options are configurable in VS Code settings under â€œCodebase Combinerâ€
 - Format (SwiftFormat): `cd SwiftExplorerApp && swiftformat .`
 - Format check: `cd SwiftExplorerApp && swiftformat --lint .`
 
+### Mac App Store packaging
+
+- Local bundle validation: `Packaging/AppStore/build_app_store_package.sh --skip-signing`
+- App Store signing/package flow: see `Packaging/AppStore/README.md`
+- Output directory: `dist/app-store/`
+
 ## Quality gates
 
 - JS: ESLint + Prettier + Mocha

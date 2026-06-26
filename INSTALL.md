@@ -103,9 +103,57 @@ Then run:
 swiftformat .
 ```
 
-## Optional: create a distributable .app bundle
+## Optional: create a local .app bundle
 
-1. Archive with SwiftPM:
+For local App Store-style bundle validation:
+
+```sh
+Packaging/AppStore/build_app_store_package.sh --skip-signing
+open "dist/app-store/Codebase Combiner.app"
+```
+
+This creates a sandbox-entitled, ad-hoc signed app bundle for local validation only. It is not uploadable to App Store Connect until it is signed with Apple distribution assets.
+
+## Mac App Store packaging
+
+The repo includes a packaging pipeline under `Packaging/AppStore/`.
+
+Prerequisites for the real upload path:
+
+- Apple Developer Program membership.
+- Bundle ID registered as `com.s1korrrr.codebasecombiner`.
+- Mac App Store provisioning profile for that bundle ID.
+- App signing identity such as `Apple Distribution: <Name> (<TEAMID>)` or `3rd Party Mac Developer Application: <Name> (<TEAMID>)`.
+- Installer signing identity such as `3rd Party Mac Developer Installer: <Name> (<TEAMID>)` or `Mac Installer Distribution: <Name> (<TEAMID>)`.
+
+Build and validate locally:
+
+```sh
+Packaging/AppStore/build_app_store_package.sh --skip-signing
+```
+
+Build a signed package after the Apple signing assets are installed:
+
+```sh
+Packaging/AppStore/build_app_store_package.sh \
+  --signing-identity "Apple Distribution: <Name> (<TEAMID>)" \
+  --installer-identity "3rd Party Mac Developer Installer: <Name> (<TEAMID>)" \
+  --provisioning-profile "/path/to/profile.provisionprofile"
+```
+
+The signed package, when produced, is written to:
+
+```sh
+dist/app-store/CodebaseCombiner-AppStore.pkg
+```
+
+Upload the signed package with Apple Transporter, Xcode, `xcrun altool`, or the App Store Connect API.
+
+## Legacy SwiftPM executable copy
+
+If you only need the raw executable:
+
+1. Build with SwiftPM:
    ```sh
    swift build -c release
    ```
