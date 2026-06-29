@@ -489,7 +489,7 @@ struct ContentView: View {
             }
         }
         .padding(16)
-        .frame(minWidth: 680, maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .frame(minWidth: 500, maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .animation(reduceMotion ? nil : .spring(response: 0.36, dampingFraction: 0.86), value: showFilters)
     }
 
@@ -575,7 +575,7 @@ struct ContentView: View {
                 }
             }
         }
-        .frame(minWidth: 340, maxHeight: .infinity)
+        .frame(minWidth: 300, maxHeight: .infinity)
     }
 
     private func actionButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
@@ -929,7 +929,7 @@ struct ContentView: View {
             }
             isResizingPreview = true
             let newWidth = previewDragStartWidth - Double(value.translation.width)
-            previewWidth = min(max(340, newWidth), 760)
+            previewWidth = min(max(300, newWidth), 760)
         } onEnded: { _ in
             isResizingPreview = false
         }
