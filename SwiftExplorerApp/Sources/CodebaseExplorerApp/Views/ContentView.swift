@@ -168,13 +168,17 @@ struct ContentView: View {
                 .frame(height: 20)
 
             HStack(spacing: 8) {
-                Button(action: copyCombined) {
-                    Label("Copy", systemImage: "doc.on.doc")
+                if selectedFileNodes.isEmpty {
+                    actionButton("Copy", systemImage: "doc.on.doc", action: {})
+                        .disabled(true)
+                } else {
+                    Button(action: copyCombined) {
+                        Label("Copy", systemImage: "doc.on.doc")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.regular)
+                    .keyboardShortcut("c", modifiers: [.command, .shift])
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
-                .disabled(selectedFileNodes.isEmpty)
-                .keyboardShortcut("c", modifiers: [.command, .shift])
 
                 actionButton("Save", systemImage: "square.and.arrow.down", action: saveCombined)
                     .disabled(selectedFileNodes.isEmpty)
@@ -773,13 +777,48 @@ struct CodebaseExplorerApp: App {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillFinishLaunching(_: Notification) {
+        UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
+    }
+
+    func applicationSupportsSecureRestorableState(_: NSApplication) -> Bool {
+        false
+    }
+
+    func application(_: NSApplication, shouldSaveSecureApplicationState _: NSCoder) -> Bool {
+        false
+    }
+
+    func application(_: NSApplication, shouldRestoreSecureApplicationState _: NSCoder) -> Bool {
+        false
+    }
+
+    func application(_: NSApplication, shouldSaveApplicationState _: NSCoder) -> Bool {
+        false
+    }
+
+    func application(_: NSApplication, shouldRestoreApplicationState _: NSCoder) -> Bool {
+        false
+    }
+
     func applicationDidFinishLaunching(_: Notification) {
         // Ensure the app accepts keyboard input even when launched as a plain executable.
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         AppLog.lifecycle.info("Application finished launching")
+        DispatchQueue.main.async { self.disableWindowRestoration() }
         DispatchQueue.main.async { self.recenterOffscreenWindowsIfNeeded() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.disableWindowRestoration() }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.recenterOffscreenWindowsIfNeeded() }
+    }
+
+    @MainActor
+    private func disableWindowRestoration() {
+        for window in NSApp.windows {
+            window.isRestorable = false
+            window.restorationClass = nil
+            window.disableSnapshotRestoration()
+        }
     }
 
     @MainActor

@@ -56,18 +56,13 @@ struct ScanningIndicator: View {
 }
 
 struct EmptyStateSymbol: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let systemImage: String
-    @State private var isFloating = false
 
     var body: some View {
         Image(systemName: systemImage)
             .font(.system(size: 38, weight: .medium))
             .foregroundStyle(.secondary)
             .symbolRenderingMode(.hierarchical)
-            .offset(y: isFloating && !reduceMotion ? -3 : 0)
-            .animation(reduceMotion ? nil : .easeInOut(duration: 1.8).repeatForever(autoreverses: true), value: isFloating)
-            .onAppear { isFloating = true }
     }
 }
 
