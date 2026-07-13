@@ -12,21 +12,22 @@ final class OutputStore: ObservableObject {
     @Published private(set) var isClearConfirmationPresented = false
     @Published private(set) var status: String?
 
-    private let drafts: any DraftPersisting
+    private let persistence: OrderedDraftPersistence
     private let clipboard: any ClipboardWriting
     private let saver: any PayloadSaving
-    private let builder = CombinedOutputBuilder()
-    private let tokenEstimator = TokenEstimator()
-    private var rebuildRevision = 0
+    private let builder: any OutputBuilding
+    private var operationGeneration = 0
 
     init(
         drafts: any DraftPersisting,
         clipboard: any ClipboardWriting,
-        saver: any PayloadSaving = FilePayloadSaver()
+        saver: any PayloadSaving = FilePayloadSaver(),
+        builder: any OutputBuilding = BackgroundOutputBuilder()
     ) {
-        self.drafts = drafts
+        persistence = OrderedDraftPersistence(drafts: drafts)
         self.clipboard = clipboard
         self.saver = saver
+        self.builder = builder
     }
 
     var visiblePayload: String? {
@@ -36,49 +37,49 @@ final class OutputStore: ObservableObject {
     }
 
     func rebuild(files: [FileNode], rootPath: String?) async {
-        rebuildRevision &+= 1
-        let revision = rebuildRevision
+        let generation = beginOperation()
+        isClearConfirmationPresented = false
 
         guard !files.isEmpty else {
             currentPayload = nil
             return
         }
 
-        let text = builder.build(promptPrefix: promptPrefix, files: files, format: format)
-        currentPayload = text
-
-        let trimmedPrefix = promptPrefix.trimmingCharacters(in: .whitespacesAndNewlines)
-        let promptTokens = trimmedPrefix.isEmpty ? 0 : tokenEstimator.estimateTokens(in: trimmedPrefix)
-        let draft = ClipboardDraft(
-            text: text,
+        let input = OutputBuildInput(
+            promptPrefix: promptPrefix,
+            files: files,
             format: format,
-            fileCount: files.count,
-            tokenCount: promptTokens + files.reduce(0) { $0 + $1.tokenCount },
-            byteCount: files.reduce(0) { $0 + $1.sizeBytes },
-            rootPath: rootPath,
-            generatedAt: Date()
+            rootPath: rootPath
         )
+        let output = await builder.build(input)
+        guard isCurrent(generation) else { return }
+        currentPayload = output.payload
 
         do {
-            try await drafts.save(draft)
-            guard revision == rebuildRevision else { return }
-            recoveredDraft = draft
+            try await persistence.save(output.draft)
+            guard isCurrent(generation) else { return }
+            recoveredDraft = output.draft
             isRecoveredContentRevealed = false
             canClearRecoveredOutput = true
             status = "Saved recoverable output."
         } catch {
-            guard revision == rebuildRevision else { return }
+            guard isCurrent(generation) else { return }
             status = "Could not save the recoverable output. Check storage access and try again: \(error.localizedDescription)"
         }
     }
 
     func loadRecoveredDraft() async {
+        let generation = beginOperation()
+        isClearConfirmationPresented = false
         do {
-            let draft = try await drafts.load()
+            let draft = try await persistence.load()
+            guard isCurrent(generation) else { return }
             recoveredDraft = draft
             isRecoveredContentRevealed = false
             canClearRecoveredOutput = draft != nil
+            status = nil
         } catch {
+            guard isCurrent(generation) else { return }
             recoveredDraft = nil
             isRecoveredContentRevealed = false
             canClearRecoveredOutput = true
@@ -145,16 +146,28 @@ final class OutputStore: ObservableObject {
 
     func confirmClearRecoveredOutput() async {
         guard isClearConfirmationPresented else { return }
+        let generation = beginOperation()
 
         do {
-            try await drafts.clear()
+            try await persistence.clear()
+            guard isCurrent(generation) else { return }
             recoveredDraft = nil
             isRecoveredContentRevealed = false
             canClearRecoveredOutput = false
             isClearConfirmationPresented = false
             status = "Cleared the recovered output."
         } catch {
+            guard isCurrent(generation) else { return }
             status = "Could not clear the recovered output. Check file access and try again: \(error.localizedDescription)"
         }
+    }
+
+    private func beginOperation() -> Int {
+        operationGeneration &+= 1
+        return operationGeneration
+    }
+
+    private func isCurrent(_ generation: Int) -> Bool {
+        generation == operationGeneration
     }
 }

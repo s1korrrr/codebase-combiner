@@ -234,6 +234,22 @@ final class OutputStoreTests: XCTestCase {
         XCTAssertTrue(store.status?.contains("clear it") == true)
     }
 
+    func testSuccessfulRecoveryRetryClearsStaleFailureStatus() async {
+        let drafts = InMemoryDraftStore(
+            draft: .fixture(text: "recovered source"),
+            loadError: .persistenceDenied
+        )
+        let store = OutputStore(drafts: drafts, clipboard: RecordingClipboard())
+        await store.loadRecoveredDraft()
+        XCTAssertNotNil(store.status)
+        await drafts.allowLoads()
+
+        await store.loadRecoveredDraft()
+
+        XCTAssertNil(store.status)
+        XCTAssertEqual(store.recoveredDraft?.text, "recovered source")
+    }
+
     func testUnreadableRecoveredDraftCanStillBeClearedAfterConfirmation() async {
         let drafts = InMemoryDraftStore(loadError: .persistenceDenied)
         let store = OutputStore(drafts: drafts, clipboard: RecordingClipboard())
@@ -265,8 +281,8 @@ final class OutputStoreTests: XCTestCase {
         XCTAssertFalse(store.status?.contains("stale private source") == true)
     }
 
-    func testOlderPersistenceCompletionCannotReplaceNewerOutputState() async {
-        let drafts = ControlledDraftStore()
+    func testNewerRebuildRemainsNewestInBackingStoreAndFreshReload() async {
+        let drafts = ControlledDraftStore(suspendSaves: true)
         let store = OutputStore(drafts: drafts, clipboard: RecordingClipboard())
         let file = FileNode.fixture(
             relativePath: "notes.txt",
@@ -281,16 +297,106 @@ final class OutputStoreTests: XCTestCase {
 
         store.promptPrefix = "second request"
         let secondRebuild = Task { await store.rebuild(files: [file], rootPath: nil) }
-        await drafts.waitUntilSaveRequested(containing: "second request")
+        await waitUntil { store.currentPayload?.contains("second request") == true }
 
         await drafts.completeSave(containing: "second request")
-        await secondRebuild.value
         await drafts.completeSave(containing: "first request")
         await firstRebuild.value
+        await secondRebuild.value
 
+        let backingDraft = await drafts.currentDraft
         XCTAssertTrue(store.currentPayload?.contains("second request") == true)
         XCTAssertTrue(store.recoveredDraft?.text.contains("second request") == true)
-        XCTAssertFalse(store.recoveredDraft?.text.contains("first request") == true)
+        XCTAssertTrue(backingDraft?.text.contains("second request") == true)
+
+        let reloadedStore = OutputStore(drafts: drafts, clipboard: RecordingClipboard())
+        await reloadedStore.loadRecoveredDraft()
+        XCTAssertTrue(reloadedStore.recoveredDraft?.text.contains("second request") == true)
+    }
+
+    func testLoadCompletionCannotReplaceARebuildThatStartedLater() async {
+        let drafts = ControlledDraftStore(draft: .fixture(text: "old recovered source"))
+        await drafts.suspendNextLoad()
+        let store = OutputStore(drafts: drafts, clipboard: RecordingClipboard())
+        let file = FileNode.fixture(
+            relativePath: "notes.txt",
+            tokenCount: 1,
+            sizeBytes: 5,
+            content: "hello"
+        )
+
+        let load = Task { await store.loadRecoveredDraft() }
+        await drafts.waitUntilLoadRequested()
+        store.promptPrefix = "new rebuild"
+        let rebuild = Task { await store.rebuild(files: [file], rootPath: nil) }
+        await waitUntil { store.currentPayload?.contains("new rebuild") == true }
+
+        await drafts.completeLoad()
+        await load.value
+        await rebuild.value
+
+        let backingDraft = await drafts.currentDraft
+        XCTAssertTrue(store.recoveredDraft?.text.contains("new rebuild") == true)
+        XCTAssertTrue(backingDraft?.text.contains("new rebuild") == true)
+    }
+
+    func testClearCompletionCannotDeleteARebuildThatStartedLater() async {
+        let drafts = ControlledDraftStore(draft: .fixture(text: "old recovered source"))
+        let store = OutputStore(drafts: drafts, clipboard: RecordingClipboard())
+        await store.loadRecoveredDraft()
+        await drafts.suspendNextClear()
+        store.requestClearRecoveredOutput()
+        let clear = Task { await store.confirmClearRecoveredOutput() }
+        await drafts.waitUntilClearRequested()
+        let file = FileNode.fixture(
+            relativePath: "notes.txt",
+            tokenCount: 1,
+            sizeBytes: 5,
+            content: "hello"
+        )
+        store.promptPrefix = "new rebuild"
+        let rebuild = Task { await store.rebuild(files: [file], rootPath: nil) }
+        await waitUntil { store.currentPayload?.contains("new rebuild") == true }
+
+        await drafts.completeClear()
+        await clear.value
+        await rebuild.value
+
+        let backingDraft = await drafts.currentDraft
+        XCTAssertTrue(store.recoveredDraft?.text.contains("new rebuild") == true)
+        XCTAssertTrue(backingDraft?.text.contains("new rebuild") == true)
+        XCTAssertTrue(store.canClearRecoveredOutput)
+
+        let reloadedStore = OutputStore(drafts: drafts, clipboard: RecordingClipboard())
+        await reloadedStore.loadRecoveredDraft()
+        XCTAssertTrue(reloadedStore.recoveredDraft?.text.contains("new rebuild") == true)
+    }
+
+    func testBackgroundOutputBuilderRunsPayloadAndMetadataWorkOffMainThread() async {
+        let recorder = ThreadRecorder()
+        let builder = BackgroundOutputBuilder(onBuild: {
+            recorder.record(isMainThread: Thread.isMainThread)
+        })
+        let input = OutputBuildInput(
+            promptPrefix: "Review carefully.",
+            files: [
+                .fixture(
+                    relativePath: "Sources/App.swift",
+                    tokenCount: 3,
+                    sizeBytes: 12,
+                    content: "print(\"ok\")"
+                ),
+            ],
+            format: .markdown,
+            rootPath: "/tmp/project"
+        )
+
+        let result = await builder.build(input)
+
+        XCTAssertEqual(recorder.wasMainThread, false)
+        XCTAssertTrue(result.payload.contains("Review carefully."))
+        XCTAssertEqual(result.draft.tokenCount, 7)
+        XCTAssertEqual(result.draft.byteCount, 12)
     }
 }
 
@@ -335,6 +441,10 @@ private actor InMemoryDraftStore: DraftPersisting {
 
     func failLoads(with error: BoundaryError) {
         loadError = error
+    }
+
+    func allowLoads() {
+        loadError = nil
     }
 }
 
@@ -386,15 +496,45 @@ private actor RecordingPayloadSaver: PayloadSaving {
 
 private actor ControlledDraftStore: DraftPersisting {
     private var draft: ClipboardDraft?
+    private let suspendSaves: Bool
     private var requestedDrafts: [String: ClipboardDraft] = [:]
     private var saveContinuations: [String: CheckedContinuation<Void, Never>] = [:]
+    private var scheduledSaveCompletions: [String] = []
+    private var shouldSuspendNextLoad = false
+    private var loadWasRequested = false
+    private var pendingLoadSnapshot: ClipboardDraft?
+    private var loadContinuation: CheckedContinuation<ClipboardDraft?, Never>?
+    private var shouldSuspendNextClear = false
+    private var clearWasRequested = false
+    private var clearContinuation: CheckedContinuation<Void, Never>?
+
+    init(draft: ClipboardDraft? = nil, suspendSaves: Bool = false) {
+        self.draft = draft
+        self.suspendSaves = suspendSaves
+    }
 
     func load() async throws -> ClipboardDraft? {
-        draft
+        let snapshot = draft
+        guard shouldSuspendNextLoad else { return snapshot }
+        shouldSuspendNextLoad = false
+        loadWasRequested = true
+        pendingLoadSnapshot = snapshot
+        return await withCheckedContinuation { continuation in
+            loadContinuation = continuation
+        }
     }
 
     func save(_ draft: ClipboardDraft) async throws {
+        guard suspendSaves else {
+            self.draft = draft
+            return
+        }
         requestedDrafts[draft.text] = draft
+        if let scheduledIndex = scheduledSaveCompletions.firstIndex(where: { draft.text.contains($0) }) {
+            scheduledSaveCompletions.remove(at: scheduledIndex)
+            self.draft = draft
+            return
+        }
         await withCheckedContinuation { continuation in
             saveContinuations[draft.text] = continuation
         }
@@ -402,7 +542,45 @@ private actor ControlledDraftStore: DraftPersisting {
     }
 
     func clear() async throws {
+        if shouldSuspendNextClear {
+            shouldSuspendNextClear = false
+            clearWasRequested = true
+            await withCheckedContinuation { continuation in
+                clearContinuation = continuation
+            }
+        }
         draft = nil
+    }
+
+    func suspendNextLoad() {
+        shouldSuspendNextLoad = true
+    }
+
+    func waitUntilLoadRequested() async {
+        while !loadWasRequested {
+            await Task.yield()
+        }
+    }
+
+    func completeLoad() {
+        loadContinuation?.resume(returning: pendingLoadSnapshot)
+        loadContinuation = nil
+        pendingLoadSnapshot = nil
+    }
+
+    func suspendNextClear() {
+        shouldSuspendNextClear = true
+    }
+
+    func waitUntilClearRequested() async {
+        while !clearWasRequested {
+            await Task.yield()
+        }
+    }
+
+    func completeClear() {
+        clearContinuation?.resume()
+        clearContinuation = nil
     }
 
     func waitUntilSaveRequested(containing fragment: String) async {
@@ -413,10 +591,43 @@ private actor ControlledDraftStore: DraftPersisting {
 
     func completeSave(containing fragment: String) {
         guard let text = saveContinuations.keys.first(where: { $0.contains(fragment) }) else {
+            scheduledSaveCompletions.append(fragment)
             return
         }
         saveContinuations.removeValue(forKey: text)?.resume()
     }
+
+    var currentDraft: ClipboardDraft? {
+        draft
+    }
+}
+
+private final class ThreadRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recordedValue: Bool?
+
+    var wasMainThread: Bool? {
+        lock.withLock { recordedValue }
+    }
+
+    func record(isMainThread: Bool) {
+        lock.withLock {
+            recordedValue = isMainThread
+        }
+    }
+}
+
+@MainActor
+private func waitUntil(
+    _ condition: @escaping @MainActor () -> Bool,
+    file: StaticString = #filePath,
+    line: UInt = #line
+) async {
+    for _ in 0 ..< 10000 {
+        if condition() { return }
+        await Task.yield()
+    }
+    XCTFail("Condition did not become true", file: file, line: line)
 }
 
 private extension ClipboardDraft {
