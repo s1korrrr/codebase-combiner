@@ -3,6 +3,33 @@ import Foundation
 import XCTest
 
 final class TreeLoaderTests: XCTestCase {
+    func testLoadReportsWhyFilesWereSkipped() throws {
+        try withTemporaryDirectory { root in
+            try writeData(at: root.appendingPathComponent("binary.bin"), data: Data([0, 1, 2]))
+            try writeData(at: root.appendingPathComponent("invalid.swift"), data: Data([0xFF, 0xFE]))
+            try writeFile(at: root.appendingPathComponent("large.swift"), contents: String(repeating: "x", count: 2048))
+            try writeFile(at: root.appendingPathComponent(".hidden.swift"), contents: "hidden")
+            try writeFile(at: root.appendingPathComponent("excluded.log"), contents: "excluded")
+            try writeFile(at: root.appendingPathComponent("disallowed.txt"), contents: "disallowed")
+
+            let result = try TreeLoader().load(
+                rootURL: root,
+                allowList: ["swift", "bin"],
+                excludeList: ["log"],
+                maxFileSizeKB: 1,
+                skipHidden: true
+            )
+
+            XCTAssertEqual(result.summary.count(for: .binary), 1)
+            XCTAssertEqual(result.summary.count(for: .unreadable), 1)
+            XCTAssertEqual(result.summary.count(for: .oversized), 1)
+            XCTAssertEqual(result.summary.count(for: .hidden), 1)
+            XCTAssertEqual(result.summary.count(for: .excluded), 1)
+            XCTAssertEqual(result.summary.count(for: .disallowed), 1)
+            XCTAssertEqual(result.summary.skippedCount, 6)
+        }
+    }
+
     func testLoadTreeAppliesFiltersAndSkipsBinaryAndLargeFiles() throws {
         try withTemporaryDirectory { root in
             try writeFile(at: root.appendingPathComponent("app.js"), contents: "console.log('ok')")
