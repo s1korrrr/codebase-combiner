@@ -2,7 +2,6 @@ import AppKit
 import SwiftUI
 
 struct PromptEditor: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var isPromptFocused: Bool
 
     @Binding var prompt: String
@@ -20,11 +19,13 @@ struct PromptEditor: View {
             }
             ZStack(alignment: .topLeading) {
                 TextEditor(text: $prompt)
-                    .frame(height: 120)
+                    .frame(minHeight: 90, idealHeight: 110)
                     .padding(10)
                     .scrollContentBackground(.hidden)
                     .scrollDisabled(prompt.isEmpty)
                     .focused($isPromptFocused)
+                    .accessibilityLabel("Prompt Prefix")
+                    .accessibilityHint("Optional instructions placed before the selected file contents")
 
                 if prompt.isEmpty {
                     Text("Optional instructions to place above the selected files...")
@@ -35,17 +36,13 @@ struct PromptEditor: View {
                         .transition(.opacity)
                 }
             }
-            .frame(height: 120)
+            .frame(minHeight: 90, idealHeight: 110)
             .background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .stroke(.separator.opacity(0.45))
             }
         }
-        .padding(12)
-        .appSurface(cornerRadius: 12)
-        .hoverLift()
-        .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.86), value: prompt.isEmpty)
         .onAppear {
             isPromptFocused = false
             DispatchQueue.main.async {

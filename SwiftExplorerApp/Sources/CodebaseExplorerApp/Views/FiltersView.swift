@@ -1,8 +1,6 @@
 import SwiftUI
 
 struct FiltersView: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     @Binding var allowList: String
     @Binding var excludeList: String
     @Binding var maxFileSizeKB: Double
@@ -24,6 +22,7 @@ struct FiltersView: View {
                 }
                 .buttonStyle(.bordered)
                 .help("Open filter editor")
+                .accessibilityHint("Opens a larger editor for include and exclude extensions")
             }
 
             ViewThatFits(in: .horizontal) {
@@ -35,10 +34,7 @@ struct FiltersView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        .padding(12)
-        .appSurface(cornerRadius: 12)
-        .hoverLift()
-        .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.86), value: skipHidden)
+        .padding(.vertical, 4)
         .sheet(isPresented: $showFilterSheet) {
             FilterEditorSheet(
                 allowList: $allowList,
@@ -135,6 +131,13 @@ struct FiltersView: View {
                     .textFieldStyle(.roundedBorder)
                 Spacer(minLength: 0)
             }
+
+            if case let .invalid(message) = AppPreferences.validate(maxFileSizeKB: maxFileSizeKB) {
+                Label(message, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .accessibilityLabel("Invalid maximum file size. \(message)")
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -157,8 +160,20 @@ struct FiltersView: View {
             }
             .buttonStyle(.borderedProminent)
             .keyboardShortcut(.return, modifiers: [.command])
+            .disabled(AppPreferences.validate(maxFileSizeKB: maxFileSizeKB) != .valid)
+            .help(applyHelp)
+            .accessibilityHint(applyHelp)
         }
         .frame(width: 210, alignment: .leading)
+    }
+
+    private var applyHelp: String {
+        switch AppPreferences.validate(maxFileSizeKB: maxFileSizeKB) {
+        case .valid:
+            "Apply filters and refresh the workspace"
+        case let .invalid(message):
+            message
+        }
     }
 }
 

@@ -109,6 +109,10 @@ final class OutputStore: ObservableObject {
         isRecoveredContentRevealed = true
     }
 
+    func hideRecoveredOutput() {
+        isRecoveredContentRevealed = false
+    }
+
     func copyCurrent() {
         guard let currentPayload else {
             status = "There is no current output to copy. Select at least one file and try again."

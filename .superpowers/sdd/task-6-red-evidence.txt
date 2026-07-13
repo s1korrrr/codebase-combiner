@@ -1,0 +1,49 @@
+Task 6 RED evidence
+Captured: 2026-07-14 Europe/Warsaw
+
+Cycle 1: adaptive layout metrics
+Command: cd SwiftExplorerApp && swift test --filter AdaptiveWorkspaceSmokeTests
+Exit: 1
+
+Compiler signal:
+SwiftExplorerApp/Tests/CodebaseExplorerAppTests/AdaptiveWorkspaceSmokeTests.swift:6:23: error: cannot find 'AdaptiveWorkspaceLayout' in scope
+SwiftExplorerApp/Tests/CodebaseExplorerAppTests/AdaptiveWorkspaceSmokeTests.swift:7:23: error: cannot find 'AdaptiveWorkspaceLayout' in scope
+SwiftExplorerApp/Tests/CodebaseExplorerAppTests/AdaptiveWorkspaceSmokeTests.swift:8:20: error: cannot find 'AdaptiveWorkspaceLayout' in scope
+error: fatalError
+
+Interpretation: the behavior-first test reached the package build and failed because the adaptive presentation policy did not exist. No production source had been changed.
+
+Cycle 2: accessibility prerequisite and privacy copy
+Command: cd SwiftExplorerApp && swift test --filter AdaptiveWorkspaceSmokeTests
+Exit: 1
+
+Compiler signal:
+SwiftExplorerApp/Tests/CodebaseExplorerAppTests/AdaptiveWorkspaceSmokeTests.swift:20:13: error: cannot find 'WorkspaceAccessibility' in scope
+SwiftExplorerApp/Tests/CodebaseExplorerAppTests/AdaptiveWorkspaceSmokeTests.swift:24:13: error: cannot find 'WorkspaceAccessibility' in scope
+SwiftExplorerApp/Tests/CodebaseExplorerAppTests/AdaptiveWorkspaceSmokeTests.swift:28:13: error: cannot find 'WorkspaceAccessibility' in scope
+error: fatalError
+
+Interpretation: the first layout-policy cycle was green, then the next public accessibility-copy behavior failed before its implementation existed.
+
+Cycle 3: adaptive view construction and concealed recovered payload
+Command: cd SwiftExplorerApp && swift test --filter AdaptiveWorkspaceSmokeTests
+Exit: 1
+
+Compiler signal:
+SwiftExplorerApp/Tests/CodebaseExplorerAppTests/AdaptiveWorkspaceSmokeTests.swift:60:17: error: cannot find 'WorkspaceSidebar' in scope
+SwiftExplorerApp/Tests/CodebaseExplorerAppTests/AdaptiveWorkspaceSmokeTests.swift:61:17: error: cannot find 'PreparationWorkspace' in scope
+SwiftExplorerApp/Tests/CodebaseExplorerAppTests/AdaptiveWorkspaceSmokeTests.swift:62:17: error: cannot find 'OutputInspector' in scope
+SwiftExplorerApp/Tests/CodebaseExplorerAppTests/AdaptiveWorkspaceSmokeTests.swift:65:13: error: cannot find 'RecoveredOutputView' in scope
+error: fatalError
+
+Interpretation: the policy and accessibility cycles were green; the compile-time view contract then failed only because the new adaptive components did not yet exist. The existing `OutputStore.visiblePayload` assertion remains part of this contract.
+
+Cycle 4: conceal recovered output after reveal
+Command: cd SwiftExplorerApp && swift test --filter AdaptiveWorkspaceSmokeTests
+Exit: 1
+
+Compiler signal:
+SwiftExplorerApp/Sources/CodebaseExplorerApp/Views/RecoveredOutputView.swift:58:31: error: value of type 'OutputStore' has no dynamic member 'hideRecoveredOutput'
+error: fatalError
+
+Interpretation: the new privacy control was wired through the public store interface, then failed because the conceal action did not yet exist. The test requires `visiblePayload` to return to nil after Hide.
