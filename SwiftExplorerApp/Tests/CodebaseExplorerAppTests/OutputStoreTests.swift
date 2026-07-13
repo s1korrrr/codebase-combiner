@@ -372,6 +372,54 @@ final class OutputStoreTests: XCTestCase {
         XCTAssertTrue(reloadedStore.recoveredDraft?.text.contains("new rebuild") == true)
     }
 
+    func testEmptyRebuildDoesNotDiscardAnInFlightRecoveredDraftLoad() async {
+        let draft = ClipboardDraft.fixture(text: "recovered source")
+        let drafts = ControlledDraftStore(draft: draft)
+        await drafts.suspendNextLoad()
+        let store = OutputStore(drafts: drafts, clipboard: RecordingClipboard())
+        let load = Task { await store.loadRecoveredDraft() }
+        await drafts.waitUntilLoadRequested()
+
+        await store.rebuild(files: [], rootPath: nil)
+        await drafts.completeLoad()
+        await load.value
+
+        let backingDraft = await drafts.currentDraft
+        XCTAssertNil(store.currentPayload)
+        XCTAssertEqual(store.recoveredDraft, draft)
+        XCTAssertTrue(store.canClearRecoveredOutput)
+        XCTAssertEqual(backingDraft, draft)
+
+        let reloadedStore = OutputStore(drafts: drafts, clipboard: RecordingClipboard())
+        await reloadedStore.loadRecoveredDraft()
+        XCTAssertEqual(reloadedStore.recoveredDraft, draft)
+    }
+
+    func testEmptyRebuildDoesNotSuppressAnInFlightConfirmedClear() async {
+        let drafts = ControlledDraftStore(draft: .fixture(text: "recovered source"))
+        let store = OutputStore(drafts: drafts, clipboard: RecordingClipboard())
+        await store.loadRecoveredDraft()
+        await drafts.suspendNextClear()
+        store.requestClearRecoveredOutput()
+        let clear = Task { await store.confirmClearRecoveredOutput() }
+        await drafts.waitUntilClearRequested()
+
+        await store.rebuild(files: [], rootPath: nil)
+        await drafts.completeClear()
+        await clear.value
+
+        let backingDraft = await drafts.currentDraft
+        XCTAssertNil(store.currentPayload)
+        XCTAssertNil(store.recoveredDraft)
+        XCTAssertFalse(store.canClearRecoveredOutput)
+        XCTAssertFalse(store.isClearConfirmationPresented)
+        XCTAssertNil(backingDraft)
+
+        let reloadedStore = OutputStore(drafts: drafts, clipboard: RecordingClipboard())
+        await reloadedStore.loadRecoveredDraft()
+        XCTAssertNil(reloadedStore.recoveredDraft)
+    }
+
     func testBackgroundOutputBuilderRunsPayloadAndMetadataWorkOffMainThread() async {
         let recorder = ThreadRecorder()
         let builder = BackgroundOutputBuilder(onBuild: {
