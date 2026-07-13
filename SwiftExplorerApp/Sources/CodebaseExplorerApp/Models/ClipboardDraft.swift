@@ -1,6 +1,6 @@
 import Foundation
 
-struct ClipboardDraft: Codable, Equatable {
+struct ClipboardDraft: Codable, Equatable, Sendable {
     let text: String
     let format: CombinedOutputFormat
     let fileCount: Int

@@ -1,6 +1,6 @@
 import Foundation
 
-enum CombinedOutputFormat: String, Codable {
+enum CombinedOutputFormat: String, Codable, Sendable {
     case markdown
     case plainText
 }

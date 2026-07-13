@@ -1,19 +1,70 @@
 import Foundation
 
-struct ClipboardDraftStore: @unchecked Sendable {
-    private let fileManager: FileManager
-    private let draftURL: URL
+struct ClipboardDraftStore: DraftPersisting, @unchecked Sendable {
+    private let file: ClipboardDraftFile
+    private let asyncFile: AsyncClipboardDraftFile
 
     init(fileManager: FileManager = .default, baseDirectory: URL? = nil) {
-        self.fileManager = fileManager
-
         let directory = baseDirectory ?? fileManager
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)
             .first!
             .appendingPathComponent("Codebase Combiner", isDirectory: true)
-
-        draftURL = directory.appendingPathComponent("LastReadyClipboard.json")
+        let file = ClipboardDraftFile(
+            fileManager: fileManager,
+            draftURL: directory.appendingPathComponent("LastReadyClipboard.json")
+        )
+        self.file = file
+        asyncFile = AsyncClipboardDraftFile(file: file)
     }
+
+    func load() throws -> ClipboardDraft? {
+        try file.load()
+    }
+
+    func load() async throws -> ClipboardDraft? {
+        try await asyncFile.load()
+    }
+
+    func save(_ draft: ClipboardDraft) throws {
+        try file.save(draft)
+    }
+
+    func save(_ draft: ClipboardDraft) async throws {
+        try await asyncFile.save(draft)
+    }
+
+    func clear() throws {
+        try file.clear()
+    }
+
+    func clear() async throws {
+        try await asyncFile.clear()
+    }
+}
+
+private actor AsyncClipboardDraftFile {
+    private let file: ClipboardDraftFile
+
+    init(file: ClipboardDraftFile) {
+        self.file = file
+    }
+
+    func load() throws -> ClipboardDraft? {
+        try file.load()
+    }
+
+    func save(_ draft: ClipboardDraft) throws {
+        try file.save(draft)
+    }
+
+    func clear() throws {
+        try file.clear()
+    }
+}
+
+private struct ClipboardDraftFile: @unchecked Sendable {
+    let fileManager: FileManager
+    let draftURL: URL
 
     func load() throws -> ClipboardDraft? {
         guard fileManager.fileExists(atPath: draftURL.path) else { return nil }
