@@ -47,12 +47,14 @@
 ### Task 1: Preference Validation And Adaptive Layout Policy
 
 **Files:**
+
 - Create: `SwiftExplorerApp/Sources/CodebaseExplorerApp/Models/AppPreferences.swift`
 - Create: `SwiftExplorerApp/Sources/CodebaseExplorerApp/Models/WorkspaceLayoutPolicy.swift`
 - Create: `SwiftExplorerApp/Tests/CodebaseExplorerAppTests/AppPreferencesTests.swift`
 - Create: `SwiftExplorerApp/Tests/CodebaseExplorerAppTests/WorkspaceLayoutPolicyTests.swift`
 
 **Interfaces:**
+
 - Produces: `AppPreferences.Values`, `AppPreferences.Validation`, `AppPreferences.extensionSet(from:)`, `WorkspaceLayoutMode`, and `WorkspaceLayoutPolicy.mode(for:)`.
 - Consumes: `UserDefaults` and the existing preference keys recorded in `MEMORY.md`.
 
@@ -186,12 +188,14 @@ git commit -m "Add validated preferences and layout policy"
 ### Task 2: Structured Scan Results Without Silent Skips
 
 **Files:**
+
 - Create: `SwiftExplorerApp/Sources/CodebaseExplorerApp/Models/ScanSummary.swift`
 - Modify: `SwiftExplorerApp/Sources/CodebaseExplorerApp/Models/FileNode.swift`
 - Modify: `SwiftExplorerApp/Sources/CodebaseExplorerApp/Services/TreeLoader.swift`
 - Modify: `SwiftExplorerApp/Tests/CodebaseExplorerAppTests/TreeLoaderTests.swift`
 
 **Interfaces:**
+
 - Produces: `TreeLoadResult(root:summary:)`, `ScanSummary.record(_:)`, and `TreeLoader.load(...) throws -> TreeLoadResult`.
 - Preserves temporarily: `TreeLoader.loadTree(...) throws -> FileNode` delegates to `load(...).root` until `WorkspaceStore` replaces the legacy caller.
 
@@ -260,10 +264,12 @@ git commit -m "Report skipped files during workspace scans"
 ### Task 3: Workspace Store And Stale-Scan Rejection
 
 **Files:**
+
 - Create: `SwiftExplorerApp/Sources/CodebaseExplorerApp/Stores/WorkspaceStore.swift`
 - Create: `SwiftExplorerApp/Tests/CodebaseExplorerAppTests/WorkspaceStoreTests.swift`
 
 **Interfaces:**
+
 - Consumes: `TreeLoadResult`, `AppPreferences.Values`, and an injected async `WorkspaceLoading` boundary.
 - Produces: `WorkspaceStore.State`, `scan(rootURL:preferences:)`, `accept(_:requestID:preserveSelection:)`, `toggle`, `selectAll`, and `clearSelection`.
 
@@ -378,12 +384,14 @@ git commit -m "Move scan and selection state into a workspace store"
 ### Task 4: Output Store, Recovery Privacy, And Failure Boundaries
 
 **Files:**
+
 - Create: `SwiftExplorerApp/Sources/CodebaseExplorerApp/Support/AppDependencies.swift`
 - Create: `SwiftExplorerApp/Sources/CodebaseExplorerApp/Stores/OutputStore.swift`
 - Create: `SwiftExplorerApp/Tests/CodebaseExplorerAppTests/OutputStoreTests.swift`
 - Modify: `SwiftExplorerApp/Sources/CodebaseExplorerApp/Services/ClipboardDraftStore.swift`
 
 **Interfaces:**
+
 - Consumes: `CombinedOutputBuilder`, `ClipboardDraftStore`, selected file snapshots, prompt prefix, and output format.
 - Produces: `OutputStore.currentPayload`, `visiblePayload`, `recoveredDraft`, `revealRecoveredOutput`, `requestClearRecoveredOutput`, `cancelClearRecoveredOutput`, `confirmClearRecoveredOutput`, `copyCurrent`, `copyRecovered`, and `saveCurrent(to:)`.
 
@@ -489,6 +497,7 @@ git commit -m "Add privacy-conscious output recovery state"
 ### Task 5: Shared App Controller, Commands, And Canonical Settings
 
 **Files:**
+
 - Create: `SwiftExplorerApp/Sources/CodebaseExplorerApp/App/AppController.swift`
 - Create: `SwiftExplorerApp/Sources/CodebaseExplorerApp/App/AppCommands.swift`
 - Create: `SwiftExplorerApp/Sources/CodebaseExplorerApp/App/CodebaseExplorerApp.swift`
@@ -497,6 +506,7 @@ git commit -m "Add privacy-conscious output recovery state"
 - Modify: `SwiftExplorerApp/Sources/CodebaseExplorerApp/Views/ContentView.swift`
 
 **Interfaces:**
+
 - Consumes: `WorkspaceStore`, `OutputStore`, `AppPreferences`, `NSOpenPanel`, and `NSSavePanel`.
 - Produces: one `AppController`, `AppCommandState`, `AppCommands`, a single `Settings` scene, and shared actions used by menus and views.
 
@@ -603,6 +613,7 @@ git commit -m "Unify app actions commands and settings"
 ### Task 6: Adaptive Native Workspace And Platform Visual Style
 
 **Files:**
+
 - Create: `SwiftExplorerApp/Sources/CodebaseExplorerApp/Views/WorkspaceSidebar.swift`
 - Create: `SwiftExplorerApp/Sources/CodebaseExplorerApp/Views/PreparationWorkspace.swift`
 - Create: `SwiftExplorerApp/Sources/CodebaseExplorerApp/Views/OutputInspector.swift`
@@ -616,6 +627,7 @@ git commit -m "Unify app actions commands and settings"
 - Modify: `SwiftExplorerApp/Sources/CodebaseExplorerApp/Views/StatsBar.swift`
 
 **Interfaces:**
+
 - Consumes: `AppController`, stores, layout policy, and shared commands.
 - Produces: a 960×640-capable adaptive workspace, independent sidebar/inspector visibility, concealed recovered content, confirmation dialog, and bounded modern presentation.
 
@@ -741,6 +753,7 @@ git commit -m "Rebuild the macOS workspace with adaptive native panes"
 ### Task 7: Isolated E2E Launch, Real Interaction Sweep, And Fix Loop
 
 **Files:**
+
 - Modify: `SwiftExplorerApp/Sources/CodebaseExplorerApp/Support/AppDependencies.swift`
 - Modify: `script/build_and_run.sh`
 - Create: `script/fixtures/e2e-workspace/README.md`
@@ -750,6 +763,7 @@ git commit -m "Rebuild the macOS workspace with adaptive native panes"
 - Update as findings require: relevant source and test files from Tasks 1–6.
 
 **Interfaces:**
+
 - Produces: `./script/build_and_run.sh --e2e`, isolated `UserDefaults` suite and draft directory, disposable fixture, scenario matrix, screenshots, and log evidence.
 - Consumes: the packaged app created by the existing App Store packaging script.
 
@@ -813,6 +827,7 @@ git commit -m "Add isolated end-to-end verification for the Mac app"
 ### Task 8: Release Evidence, Documentation, And Final Verification
 
 **Files:**
+
 - Modify: `README.md`
 - Modify: `INSTALL.md`
 - Modify: `CHANGELOG.md`
@@ -824,6 +839,7 @@ git commit -m "Add isolated end-to-end verification for the Mac app"
 - Modify: `docs/audit/codebase-combiner-e2e-audit-2026-07-13.md`
 
 **Interfaces:**
+
 - Produces: current commands, architecture decisions, exact evidence, truthful readiness label, and remaining toolchain/Apple/manual blockers.
 
 - [ ] **Step 1: Update public and durable documentation**
