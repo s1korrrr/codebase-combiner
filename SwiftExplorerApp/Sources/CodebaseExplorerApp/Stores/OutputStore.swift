@@ -16,7 +16,8 @@ final class OutputStore: ObservableObject {
     private let clipboard: any ClipboardWriting
     private let saver: any PayloadSaving
     private let builder: any OutputBuilding
-    private var operationGeneration = 0
+    private var buildGeneration = 0
+    private var recoveryGeneration = 0
 
     init(
         drafts: any DraftPersisting,
@@ -37,7 +38,7 @@ final class OutputStore: ObservableObject {
     }
 
     func rebuild(files: [FileNode], rootPath: String?) async {
-        let generation = beginOperation()
+        let buildRevision = beginBuildOperation()
         isClearConfirmationPresented = false
 
         guard !files.isEmpty else {
@@ -52,34 +53,35 @@ final class OutputStore: ObservableObject {
             rootPath: rootPath
         )
         let output = await builder.build(input)
-        guard isCurrent(generation) else { return }
+        guard isCurrentBuild(buildRevision) else { return }
+        let recoveryRevision = beginRecoveryOperation(cancelPendingBuild: false)
         currentPayload = output.payload
 
         do {
             try await persistence.save(output.draft)
-            guard isCurrent(generation) else { return }
+            guard isCurrentRecovery(recoveryRevision) else { return }
             recoveredDraft = output.draft
             isRecoveredContentRevealed = false
             canClearRecoveredOutput = true
             status = "Saved recoverable output."
         } catch {
-            guard isCurrent(generation) else { return }
+            guard isCurrentRecovery(recoveryRevision) else { return }
             status = "Could not save the recoverable output. Check storage access and try again: \(error.localizedDescription)"
         }
     }
 
     func loadRecoveredDraft() async {
-        let generation = beginOperation()
+        let recoveryRevision = beginRecoveryOperation(cancelPendingBuild: true)
         isClearConfirmationPresented = false
         do {
             let draft = try await persistence.load()
-            guard isCurrent(generation) else { return }
+            guard isCurrentRecovery(recoveryRevision) else { return }
             recoveredDraft = draft
             isRecoveredContentRevealed = false
             canClearRecoveredOutput = draft != nil
             status = nil
         } catch {
-            guard isCurrent(generation) else { return }
+            guard isCurrentRecovery(recoveryRevision) else { return }
             recoveredDraft = nil
             isRecoveredContentRevealed = false
             canClearRecoveredOutput = true
@@ -146,28 +148,40 @@ final class OutputStore: ObservableObject {
 
     func confirmClearRecoveredOutput() async {
         guard isClearConfirmationPresented else { return }
-        let generation = beginOperation()
+        let recoveryRevision = beginRecoveryOperation(cancelPendingBuild: true)
 
         do {
             try await persistence.clear()
-            guard isCurrent(generation) else { return }
+            guard isCurrentRecovery(recoveryRevision) else { return }
             recoveredDraft = nil
             isRecoveredContentRevealed = false
             canClearRecoveredOutput = false
             isClearConfirmationPresented = false
             status = "Cleared the recovered output."
         } catch {
-            guard isCurrent(generation) else { return }
+            guard isCurrentRecovery(recoveryRevision) else { return }
             status = "Could not clear the recovered output. Check file access and try again: \(error.localizedDescription)"
         }
     }
 
-    private func beginOperation() -> Int {
-        operationGeneration &+= 1
-        return operationGeneration
+    private func beginBuildOperation() -> Int {
+        buildGeneration &+= 1
+        return buildGeneration
     }
 
-    private func isCurrent(_ generation: Int) -> Bool {
-        generation == operationGeneration
+    private func beginRecoveryOperation(cancelPendingBuild: Bool) -> Int {
+        if cancelPendingBuild {
+            buildGeneration &+= 1
+        }
+        recoveryGeneration &+= 1
+        return recoveryGeneration
+    }
+
+    private func isCurrentBuild(_ generation: Int) -> Bool {
+        generation == buildGeneration
+    }
+
+    private func isCurrentRecovery(_ generation: Int) -> Bool {
+        generation == recoveryGeneration
     }
 }
