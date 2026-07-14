@@ -1,6 +1,41 @@
 import AppKit
 import Foundation
 
+@MainActor
+struct AppDependencies {
+    static let e2eDataDirectoryEnvironmentKey = "CODEBASE_COMBINER_E2E_DATA_DIR"
+    static let e2eWindowSizeEnvironmentKey = "CODEBASE_COMBINER_E2E_WINDOW_SIZE"
+    static let e2eDefaultsSuiteName = "com.s1korrrr.codebasecombiner.e2e"
+
+    let defaults: UserDefaults
+    let draftBaseDirectory: URL?
+    let initialWindowSize: CGSize?
+
+    init(environment: [String: String] = ProcessInfo.processInfo.environment) {
+        if let path = environment[Self.e2eDataDirectoryEnvironmentKey], !path.isEmpty {
+            guard let defaults = UserDefaults(suiteName: Self.e2eDefaultsSuiteName) else {
+                preconditionFailure("Unable to create the isolated E2E defaults suite.")
+            }
+            self.defaults = defaults
+            draftBaseDirectory = URL(fileURLWithPath: path, isDirectory: true)
+        } else {
+            defaults = .standard
+            draftBaseDirectory = nil
+        }
+        initialWindowSize = Self.parseWindowSize(environment[Self.e2eWindowSizeEnvironmentKey])
+    }
+
+    private static func parseWindowSize(_ value: String?) -> CGSize? {
+        guard let value else { return nil }
+        let dimensions = value.lowercased().split(separator: "x", omittingEmptySubsequences: false)
+        guard dimensions.count == 2,
+              let width = Double(dimensions[0]), width > 0,
+              let height = Double(dimensions[1]), height > 0
+        else { return nil }
+        return CGSize(width: width, height: height)
+    }
+}
+
 protocol DraftPersisting: Sendable {
     func load() async throws -> ClipboardDraft?
     func save(_ draft: ClipboardDraft) async throws

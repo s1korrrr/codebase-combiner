@@ -240,6 +240,13 @@ final class AdaptiveWorkspaceSmokeTests: XCTestCase {
         XCTAssertFalse(source.contains("Label(output.format"))
     }
 
+    func testWorkspaceDoesNotMutatePaneVisibilityDuringGeometryLayout() throws {
+        let source = try sourceFile(named: "ContentView.swift")
+
+        XCTAssertFalse(source.contains("collapseInspectorIfNeeded"))
+        XCTAssertFalse(source.contains(".onChange(of: proxy.size.width)"))
+    }
+
     private func sourceFile(named name: String) throws -> String {
         let packageRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

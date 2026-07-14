@@ -4,13 +4,20 @@ import SwiftUI
 @main
 struct CodebaseExplorerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @StateObject private var controller = AppController.live()
+    @StateObject private var controller: AppController
+    private let initialWindowSize: CGSize
+
+    init() {
+        let dependencies = AppDependencies()
+        _controller = StateObject(wrappedValue: AppController.live(dependencies: dependencies))
+        initialWindowSize = dependencies.initialWindowSize ?? CGSize(width: 1180, height: 760)
+    }
 
     var body: some Scene {
         WindowGroup("Codebase Combiner") {
             ContentView(controller: controller)
         }
-        .defaultSize(width: 1180, height: 760)
+        .defaultSize(width: initialWindowSize.width, height: initialWindowSize.height)
         .commands {
             AppCommands(controller: controller)
         }
@@ -21,9 +28,12 @@ struct CodebaseExplorerApp: App {
     }
 }
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private let defaults = AppDependencies().defaults
+
     func applicationWillFinishLaunching(_: Notification) {
-        UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
+        defaults.set(false, forKey: "NSQuitAlwaysKeepsWindows")
     }
 
     func applicationSupportsSecureRestorableState(_: NSApplication) -> Bool {
