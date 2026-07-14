@@ -18,7 +18,7 @@ The final sandboxed host completed the primary workflow: real open panel, fixtur
 - The only opened workspaces were synthetic fixtures under `/private/tmp`: the functional fixture copied to `/private/tmp/CodebaseCombinerE2EFixture` and the disposable 1,500-file performance fixture.
 - `script/build_and_run.sh` launches the exact executable directly, captures `$!`, verifies its full command twice, and terminates/reaps only that owned PID. It contains no `pgrep`, `pkill`, or application-name launch/discovery.
 - `--verify` owns its launch through cleanup. `--e2e` is a foreground wrapper and removes its PID file only after the child exits or is reaped.
-- Clipboard tests backed up and restored the existing pasteboard. Saved output stayed under `/private/tmp`.
+- Clipboard tests backed up and restored the existing pasteboard. Saved output stayed in the standard scoped E2E export directory at `/private/tmp/CodebaseCombinerE2EExport`.
 
 ## Runtime Corrections
 
@@ -78,7 +78,7 @@ Final runtime proof used sandbox PID `25766`: after the real fixture loaded, fiv
 | Persistence   | Sandbox container                                                | Preferences and `LastReadyClipboard.json` resolved inside the distinct E2E container Application Support directory; production state was untouched.                                      | Verified — corrected host; on-disk container inspection and dependency tests                |
 | Logs          | Structured telemetry and privacy                                 | Scan, persistence, copy, save, clear, accepted/rejected/failed/stale outcomes use typed metadata only; no payload, prompt, root, or destination is interpolated.                         | Verified — corrected host; unified log plus `AppTelemetryTests`                             |
 | Performance   | 1,500-file Release fixture                                       | 14,055,000 source bytes and 3,513,000 file tokens: scan accepted in 330 ms; output/recovery ready in 611 ms; peak CPU 88.6%; peak RSS 252,368 KB; post-scan pane response 878 ms.        | Verified — corrected host; exact PID `51225`, logs, 601 samples, AX                         |
-| Cleanup       | Processes, container data, fixtures                              | Foreground wrapper reaped its exact child. E2E `Data`, runtime files, functional/performance fixtures, and sampler output were removed; OS-owned container metadata shell was preserved. | Verified after final cleanup; exact-PID and filesystem checks                               |
+| Cleanup       | Processes, container data, fixtures, export                      | The wrapper reaped its exact child. E2E `Data`, runtime files, functional/performance fixtures, export and sampler output were removed; OS-owned container metadata shell was preserved. | Verified after final cleanup; exact-PID and filesystem checks                               |
 
 ## Bounded Release Performance
 

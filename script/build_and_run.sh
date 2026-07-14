@@ -17,6 +17,7 @@ E2E_PREFERENCES="$HOME/Library/Preferences/$E2E_BUNDLE_ID.plist"
 E2E_RUNTIME_DIR="/private/tmp/CodebaseCombinerE2ERuntime"
 E2E_FIXTURE_SOURCE="$ROOT_DIR/script/fixtures/e2e-workspace"
 E2E_FIXTURE="/private/tmp/CodebaseCombinerE2EFixture"
+E2E_EXPORT="/private/tmp/CodebaseCombinerE2EExport"
 E2E_PID_FILE="$E2E_RUNTIME_DIR/app.pid"
 OWNED_PID=""
 OWNED_EXECUTABLE=""
@@ -32,7 +33,7 @@ usage: $0 [run|--verify|--logs|--e2e|--clean-e2e-state]
   --logs              Build and launch one exact production PID; stream only its logs until interrupted.
   --e2e               Build and run the sandboxed E2E host in this foreground wrapper.
                       Press Ctrl-C to terminate and reap only the printed E2E PID.
-  --clean-e2e-state   Remove E2E app-owned container data, preferences, runtime files, and fixture.
+  --clean-e2e-state   Remove E2E app-owned container data, preferences, runtime files, fixture, and export.
 
 Set CODEBASE_COMBINER_E2E_RESET=0 to preserve the E2E container for a recovery relaunch.
 Set CODEBASE_COMBINER_E2E_WINDOW_SIZE=960x640 (or another WxH) for deterministic UI proof.
@@ -148,7 +149,7 @@ reset_e2e_state() {
 
 clean_e2e_artifacts() {
   reset_e2e_state
-  rm -rf "$E2E_RUNTIME_DIR" "$E2E_FIXTURE"
+  rm -rf "$E2E_RUNTIME_DIR" "$E2E_FIXTURE" "$E2E_EXPORT"
 }
 
 build_sandboxed_e2e_app() {
@@ -223,7 +224,7 @@ case "$MODE" in
     ;;
   --clean-e2e-state|clean-e2e-state)
     clean_e2e_artifacts
-    echo "Removed E2E app-owned container data, preferences, runtime files, and fixture."
+    echo "Removed E2E app-owned container data, preferences, runtime files, fixture, and export."
     ;;
   -h|--help|help)
     usage

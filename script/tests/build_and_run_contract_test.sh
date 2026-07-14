@@ -18,10 +18,12 @@ rg -F -- '--bundle-id "$E2E_BUNDLE_ID"' "$SCRIPT" >/dev/null
 rg -F "Print :com.apple.security.app-sandbox" "$SCRIPT" >/dev/null
 rg -F "Print :com.apple.security.files.user-selected.read-write" "$SCRIPT" >/dev/null
 rg -F 'E2E_FIXTURE="/private/tmp/CodebaseCombinerE2EFixture"' "$SCRIPT" >/dev/null
+rg -F 'E2E_EXPORT="/private/tmp/CodebaseCombinerE2EExport"' "$SCRIPT" >/dev/null
 rg -F 'rm -rf "$E2E_CONTAINER/Data"' "$SCRIPT" >/dev/null
+rg -F 'rm -rf "$E2E_RUNTIME_DIR" "$E2E_FIXTURE" "$E2E_EXPORT"' "$SCRIPT" >/dev/null
 if rg -F 'rm -rf "$E2E_CONTAINER"' "$SCRIPT"; then
   echo "E2E cleanup must preserve the OS-owned container metadata shell." >&2
   exit 1
 fi
 
-echo "build_and_run process, sandbox, and fixture contracts passed"
+echo "build_and_run process, sandbox, fixture, and export contracts passed"
