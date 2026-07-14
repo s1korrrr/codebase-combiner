@@ -13,4 +13,10 @@ final class TokenEstimatorTests: XCTestCase {
         let text = String(repeating: "a", count: 20)
         XCTAssertEqual(estimator.estimateTokens(in: text), 5)
     }
+
+    func testPromptTokenPolicyShowsZeroForEmptyOrWhitespaceOnlyPrompt() {
+        XCTAssertEqual(PromptTokenPolicy.estimate(in: ""), 0)
+        XCTAssertEqual(PromptTokenPolicy.estimate(in: "   \n"), 0)
+        XCTAssertEqual(PromptTokenPolicy.estimate(in: "review"), 1)
+    }
 }

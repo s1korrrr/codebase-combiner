@@ -23,6 +23,40 @@ final class ClipboardDraftStoreTests: XCTestCase {
             XCTAssertNil(try store.load())
         }
     }
+
+    @MainActor
+    func testAsyncPersistenceBoundaryPreservesTheExistingJSONSchema() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+            .resolvingSymlinksInPath()
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let persistence: any DraftPersisting = ClipboardDraftStore(baseDirectory: root)
+        let draft = ClipboardDraft(
+            text: "ready payload",
+            format: .plainText,
+            fileCount: 3,
+            tokenCount: 21,
+            byteCount: 256,
+            rootPath: "/tmp/project",
+            generatedAt: Date(timeIntervalSince1970: 1_800_000_001)
+        )
+
+        try await persistence.save(draft)
+        let data = try Data(contentsOf: root.appendingPathComponent("LastReadyClipboard.json"))
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(
+            Set(json.keys),
+            Set(["text", "format", "fileCount", "tokenCount", "byteCount", "rootPath", "generatedAt"])
+        )
+        let loadedDraft = try await persistence.load()
+        XCTAssertEqual(loadedDraft, draft)
+
+        try await persistence.clear()
+        let clearedDraft = try await persistence.load()
+        XCTAssertNil(clearedDraft)
+    }
 }
 
 private func withTemporaryDirectory(_ body: (URL) throws -> Void) throws {

@@ -1,12 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @AppStorage("cc_allowListString") private var allowListString: String = "swift,js,ts,tsx,jsx,md,txt,py"
-    @AppStorage("cc_excludeListString") private var excludeListString: String = "png,jpg,jpeg,gif,mp4,zip,bin,lock"
-    @AppStorage("cc_maxFileSizeKB") private var maxFileSizeKB: Double = 512
-    @AppStorage("cc_skipHidden") private var skipHidden = true
-    @AppStorage("cc_outputMarkdown") private var outputMarkdown = true
-    @AppStorage("cc_showFilters") private var showFilters = true
+    @ObservedObject var preferences: AppPreferences
 
     var body: some View {
         TabView {
@@ -27,23 +22,23 @@ struct SettingsView: View {
     private var generalSettings: some View {
         Form {
             Section("Output") {
-                Picker("Default format", selection: $outputMarkdown) {
+                Picker("Default format", selection: outputMarkdown) {
                     Text("Markdown").tag(true)
                     Text("Plain Text").tag(false)
                 }
                 .pickerStyle(.segmented)
 
-                Toggle("Show filters in main window", isOn: $showFilters)
+                Toggle("Show filters in main window", isOn: showFilters)
             }
 
             Section("Scan defaults") {
-                Toggle("Skip hidden files", isOn: $skipHidden)
+                Toggle("Skip hidden files", isOn: skipHidden)
 
                 HStack {
-                    Slider(value: $maxFileSizeKB, in: 32 ... 8192, step: 32) {
+                    Slider(value: maxFileSizeKB, in: 32 ... 8192, step: 32) {
                         Text("Max file size")
                     }
-                    Text("\(Int(maxFileSizeKB)) KB")
+                    Text("\(Int(preferences.values.maxFileSizeKB)) KB")
                         .font(.body.monospacedDigit())
                         .frame(width: 90, alignment: .trailing)
                 }
@@ -54,7 +49,7 @@ struct SettingsView: View {
                     Text("Include")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                    TextField("swift,js,ts,tsx,jsx,md,txt,py", text: $allowListString)
+                    TextField("swift,js,ts,tsx,jsx,md,txt,py", text: allowListString)
                         .textFieldStyle(.roundedBorder)
                 }
 
@@ -62,12 +57,54 @@ struct SettingsView: View {
                     Text("Exclude")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                    TextField("png,jpg,jpeg,gif,mp4,zip,bin,lock", text: $excludeListString)
+                    TextField("png,jpg,jpeg,gif,mp4,zip,bin,lock", text: excludeListString)
                         .textFieldStyle(.roundedBorder)
                 }
             }
         }
         .formStyle(.grouped)
+    }
+
+    private var allowListString: Binding<String> {
+        Binding(
+            get: { preferences.values.allowList },
+            set: { preferences.values.allowList = $0 }
+        )
+    }
+
+    private var excludeListString: Binding<String> {
+        Binding(
+            get: { preferences.values.excludeList },
+            set: { preferences.values.excludeList = $0 }
+        )
+    }
+
+    private var maxFileSizeKB: Binding<Double> {
+        Binding(
+            get: { preferences.values.maxFileSizeKB },
+            set: { preferences.values.maxFileSizeKB = $0 }
+        )
+    }
+
+    private var skipHidden: Binding<Bool> {
+        Binding(
+            get: { preferences.values.skipHidden },
+            set: { preferences.values.skipHidden = $0 }
+        )
+    }
+
+    private var outputMarkdown: Binding<Bool> {
+        Binding(
+            get: { preferences.values.outputMarkdown },
+            set: { preferences.values.outputMarkdown = $0 }
+        )
+    }
+
+    private var showFilters: Binding<Bool> {
+        Binding(
+            get: { preferences.values.showFilters },
+            set: { preferences.values.showFilters = $0 }
+        )
     }
 
     private var supportSettings: some View {

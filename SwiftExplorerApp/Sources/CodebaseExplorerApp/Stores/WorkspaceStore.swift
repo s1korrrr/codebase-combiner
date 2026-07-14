@@ -1,0 +1,255 @@
+import Combine
+import Foundation
+
+protocol WorkspaceLoading: Sendable {
+    func load(rootURL: URL, preferences: AppPreferences.Values) async throws -> TreeLoadResult
+}
+
+struct LiveWorkspaceLoader: WorkspaceLoading {
+    func load(rootURL: URL, preferences: AppPreferences.Values) async throws -> TreeLoadResult {
+        try await Task.detached(priority: .userInitiated) {
+            try TreeLoader().load(
+                rootURL: rootURL,
+                allowList: AppPreferences.extensionSet(from: preferences.allowList),
+                excludeList: AppPreferences.extensionSet(from: preferences.excludeList),
+                maxFileSizeKB: Int(preferences.maxFileSizeKB),
+                skipHidden: preferences.skipHidden
+            )
+        }.value
+    }
+}
+
+enum WorkspaceScanOutcome: Equatable, Sendable {
+    case accepted(fileCount: Int, selectedCount: Int, skippedCount: Int)
+    case rejectedInvalidMaximumFileSize
+    case failed
+    case stale
+}
+
+struct WorkspaceScanFailure: Equatable, Sendable {
+    enum Kind: Equatable, Sendable {
+        case scanFailed
+    }
+
+    let kind: Kind
+    let message: String
+}
+
+@MainActor
+final class WorkspaceStore: ObservableObject {
+    struct State: Equatable {
+        var rootURL: URL?
+        var rootNode: FileNode?
+        var allFiles: [FileNode] = []
+        var selectedIDs: Set<String> = []
+        var selectedFiles: [FileNode] = []
+        var selectedBytes = 0
+        var selectedTokens = 0
+        var summary = ScanSummary()
+        var isScanning = false
+        var status = "Choose a workspace to begin."
+        var scanFailure: WorkspaceScanFailure?
+    }
+
+    @Published private(set) var state = State()
+
+    var rootURL: URL? {
+        state.rootURL
+    }
+
+    var rootNode: FileNode? {
+        state.rootNode
+    }
+
+    var allFiles: [FileNode] {
+        state.allFiles
+    }
+
+    var selectedIDs: Set<String> {
+        state.selectedIDs
+    }
+
+    var selectedFiles: [FileNode] {
+        state.selectedFiles
+    }
+
+    var selectedBytes: Int {
+        state.selectedBytes
+    }
+
+    var selectedTokens: Int {
+        state.selectedTokens
+    }
+
+    var summary: ScanSummary {
+        state.summary
+    }
+
+    var isScanning: Bool {
+        state.isScanning
+    }
+
+    var status: String {
+        state.status
+    }
+
+    var scanFailure: WorkspaceScanFailure? {
+        state.scanFailure
+    }
+
+    var canRetryFailedScan: Bool {
+        failedRequest != nil && !state.isScanning
+    }
+
+    private(set) var activeRequestID: UUID?
+    private var pendingRootURL: URL?
+    private var failedRequest: ScanRequest?
+    private let loader: any WorkspaceLoading
+
+    init(loader: any WorkspaceLoading = LiveWorkspaceLoader()) {
+        self.loader = loader
+    }
+
+    @discardableResult
+    func scan(rootURL: URL, preferences: AppPreferences.Values) async -> WorkspaceScanOutcome {
+        let requestID = UUID()
+        activeRequestID = requestID
+        pendingRootURL = nil
+        failedRequest = nil
+
+        guard AppPreferences.validate(maxFileSizeKB: preferences.maxFileSizeKB) == .valid else {
+            activeRequestID = nil
+            var rejectedState = state
+            rejectedState.isScanning = false
+            rejectedState.status = "Correct the maximum file size before scanning."
+            rejectedState.scanFailure = nil
+            state = rejectedState
+            return .rejectedInvalidMaximumFileSize
+        }
+
+        let preserveSelection = self.rootURL == rootURL
+        pendingRootURL = rootURL
+        var scanningState = state
+        scanningState.isScanning = true
+        scanningState.status = "Scanning…"
+        scanningState.scanFailure = nil
+        state = scanningState
+
+        do {
+            let result = try await loader.load(rootURL: rootURL, preferences: preferences)
+            return accept(result, requestID: requestID, preserveSelection: preserveSelection)
+        } catch {
+            guard activeRequestID == requestID else { return .stale }
+            activeRequestID = nil
+            pendingRootURL = nil
+            var failedState = state
+            failedState.isScanning = false
+            failedState.status = error.localizedDescription
+            failedState.scanFailure = WorkspaceScanFailure(kind: .scanFailed, message: error.localizedDescription)
+            failedRequest = ScanRequest(rootURL: rootURL, preferences: preferences)
+            state = failedState
+            return .failed
+        }
+    }
+
+    func accept(
+        _ result: TreeLoadResult,
+        requestID: UUID,
+        preserveSelection: Bool
+    ) -> WorkspaceScanOutcome {
+        guard activeRequestID == requestID, let acceptedRootURL = pendingRootURL else { return .stale }
+
+        let files = Self.flattenFiles(result.root)
+        let availableIDs = Set(files.map(\.id))
+        let nextSelectedIDs = preserveSelection
+            ? state.selectedIDs.intersection(availableIDs)
+            : availableIDs
+        let selection = Self.selectionSnapshot(files: files, selectedIDs: nextSelectedIDs)
+
+        var acceptedState = state
+        acceptedState.rootURL = acceptedRootURL
+        acceptedState.rootNode = result.root
+        acceptedState.allFiles = files
+        acceptedState.selectedIDs = nextSelectedIDs
+        acceptedState.selectedFiles = selection.files
+        acceptedState.selectedBytes = selection.bytes
+        acceptedState.selectedTokens = selection.tokens
+        acceptedState.summary = result.summary
+        acceptedState.isScanning = false
+        acceptedState.status = nextSelectedIDs.isEmpty
+            ? "Loaded \(files.count) files"
+            : "Loaded \(files.count) files, \(nextSelectedIDs.count) selected"
+        acceptedState.scanFailure = nil
+        activeRequestID = nil
+        pendingRootURL = nil
+        state = acceptedState
+        return .accepted(
+            fileCount: files.count,
+            selectedCount: nextSelectedIDs.count,
+            skippedCount: result.summary.skippedCount
+        )
+    }
+
+    func retryFailedScan() async -> WorkspaceScanOutcome {
+        guard let failedRequest else { return .failed }
+        return await scan(rootURL: failedRequest.rootURL, preferences: failedRequest.preferences)
+    }
+
+    func toggle(node: FileNode, isOn: Bool) {
+        let availableIDs = Set(state.allFiles.map(\.id))
+        let nodeIDs = Set(Self.gatherFileIDs(node)).intersection(availableIDs)
+
+        if isOn {
+            setSelectionIDs(state.selectedIDs.union(nodeIDs))
+        } else {
+            setSelectionIDs(state.selectedIDs.subtracting(nodeIDs))
+        }
+    }
+
+    func clearSelection() {
+        setSelectionIDs([])
+    }
+
+    func selectAll() {
+        setSelectionIDs(Set(state.allFiles.map(\.id)))
+    }
+
+    private nonisolated static func flattenFiles(_ node: FileNode) -> [FileNode] {
+        ([node] + node.children.flatMap(flattenFiles))
+            .filter { !$0.isDirectory }
+            .sorted {
+                $0.relativePath.localizedCaseInsensitiveCompare($1.relativePath) == .orderedAscending
+            }
+    }
+
+    private nonisolated static func gatherFileIDs(_ node: FileNode) -> [String] {
+        node.isDirectory ? node.children.flatMap(gatherFileIDs) : [node.id]
+    }
+
+    private nonisolated static func selectionSnapshot(
+        files: [FileNode],
+        selectedIDs: Set<String>
+    ) -> (files: [FileNode], bytes: Int, tokens: Int) {
+        let selectedFiles = files.filter { selectedIDs.contains($0.id) }
+        return (
+            selectedFiles,
+            selectedFiles.reduce(0) { $0 + $1.sizeBytes },
+            selectedFiles.reduce(0) { $0 + $1.tokenCount }
+        )
+    }
+
+    private func setSelectionIDs(_ selectedIDs: Set<String>) {
+        let selection = Self.selectionSnapshot(files: state.allFiles, selectedIDs: selectedIDs)
+        var selectionState = state
+        selectionState.selectedIDs = selectedIDs
+        selectionState.selectedFiles = selection.files
+        selectionState.selectedBytes = selection.bytes
+        selectionState.selectedTokens = selection.tokens
+        state = selectionState
+    }
+}
+
+private struct ScanRequest: Sendable {
+    let rootURL: URL
+    let preferences: AppPreferences.Values
+}

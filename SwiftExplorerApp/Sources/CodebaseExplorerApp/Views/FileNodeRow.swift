@@ -1,12 +1,9 @@
 import SwiftUI
 
 struct FileNodeRow: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     let node: FileNode
     let isSelected: Bool
     let onToggle: (Bool) -> Void
-    @State private var isHovering = false
 
     var body: some View {
         HStack(spacing: 10) {
@@ -29,6 +26,9 @@ struct FileNodeRow: View {
             }
             .toggleStyle(.checkbox)
             .buttonStyle(.plain)
+            .accessibilityLabel(node.isDirectory ? "Select folder \(node.name)" : "Select file \(node.name)")
+            .accessibilityValue(isSelected ? "Selected" : "Not selected")
+            .accessibilityHint(node.isDirectory ? "Changes the selection for every file in this folder" : "Changes whether this file is included")
 
             Spacer()
 
@@ -41,13 +41,5 @@ struct FileNodeRow: View {
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(isHovering || isSelected ? Color.accentColor.opacity(isSelected ? 0.12 : 0.06) : Color.clear)
-        )
-        .scaleEffect(isHovering && !reduceMotion ? 1.006 : 1, anchor: .leading)
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isHovering)
-        .animation(reduceMotion ? nil : .spring(response: 0.24, dampingFraction: 0.82), value: isSelected)
-        .onHover { isHovering = $0 }
     }
 }

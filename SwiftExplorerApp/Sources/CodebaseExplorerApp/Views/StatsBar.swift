@@ -1,8 +1,6 @@
 import SwiftUI
 
 struct StatsBar: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     let totalFiles: Int
     let selectedFiles: Int
     let tokenCount: Int
@@ -11,14 +9,13 @@ struct StatsBar: View {
     var body: some View {
         HStack(spacing: 10) {
             stat(label: "Files", value: "\(selectedFiles)/\(totalFiles)", systemImage: "doc.text")
+            Divider()
             stat(label: "Tokens", value: "\(tokenCount)", systemImage: "number")
+            Divider()
             stat(label: "Size", value: ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file), systemImage: "internaldrive")
         }
-        .padding(10)
-        .appSurface(cornerRadius: 12)
-        .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.82), value: selectedFiles)
-        .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.82), value: tokenCount)
-        .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.82), value: bytes)
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .contain)
     }
 
     private func stat(label: String, value: String, systemImage: String) -> some View {
@@ -32,14 +29,11 @@ struct StatsBar: View {
                     .foregroundStyle(.secondary)
                 Text(value)
                     .font(.body.monospacedDigit())
-                    .id(value)
-                    .transition(.opacity.combined(with: .scale(scale: 0.92)))
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .hoverLift()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label): \(value)")
     }
 }

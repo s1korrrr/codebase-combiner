@@ -8,3 +8,11 @@ struct TokenEstimator {
         return max(1, Int(Double(scalarCount) / 4.0))
     }
 }
+
+enum PromptTokenPolicy {
+    static func estimate(in prompt: String) -> Int {
+        let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return 0 }
+        return TokenEstimator().estimateTokens(in: trimmed)
+    }
+}

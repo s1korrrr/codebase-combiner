@@ -3,6 +3,90 @@ import Foundation
 import XCTest
 
 final class TreeLoaderTests: XCTestCase {
+    func testLoadRejectsSymbolicLinkWorkspaceRootWithoutNamingItsTarget() throws {
+        try withTemporaryDirectory { container in
+            let target = container.appendingPathComponent("private-target", isDirectory: true)
+            try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+            try writeFile(at: target.appendingPathComponent("secret.swift"), contents: "private source")
+            let linkedRoot = container.appendingPathComponent("linked-workspace")
+            try FileManager.default.createSymbolicLink(at: linkedRoot, withDestinationURL: target)
+
+            XCTAssertThrowsError(
+                try TreeLoader().load(
+                    rootURL: linkedRoot,
+                    allowList: ["swift"],
+                    excludeList: [],
+                    maxFileSizeKB: 1,
+                    skipHidden: true
+                )
+            ) { error in
+                let message = error.localizedDescription
+                XCTAssertEqual(message, "Symbolic-link workspace roots are not supported.")
+                XCTAssertFalse(message.contains(target.path))
+            }
+        }
+    }
+
+    func testLoadRejectsInRootAndEscapingSymbolicLinksBeforeReadingTargets() throws {
+        try withTemporaryDirectory { root in
+            let hiddenTargets = root.appendingPathComponent(".targets", isDirectory: true)
+            try FileManager.default.createDirectory(at: hiddenTargets, withIntermediateDirectories: true)
+            let oversizedTarget = hiddenTargets.appendingPathComponent("oversized.swift")
+            try writeFile(at: oversizedTarget, contents: String(repeating: "x", count: 4096))
+            try FileManager.default.createSymbolicLink(
+                at: root.appendingPathComponent("linked-large.swift"),
+                withDestinationURL: oversizedTarget
+            )
+
+            let outsideTarget = root.deletingLastPathComponent().appendingPathComponent("outside-\(UUID().uuidString).swift")
+            try writeFile(at: outsideTarget, contents: "private outside source")
+            defer { try? FileManager.default.removeItem(at: outsideTarget) }
+            try FileManager.default.createSymbolicLink(
+                at: root.appendingPathComponent("escaping.swift"),
+                withDestinationURL: outsideTarget
+            )
+
+            let result = try TreeLoader().load(
+                rootURL: root,
+                allowList: ["swift"],
+                excludeList: [],
+                maxFileSizeKB: 1,
+                skipHidden: true
+            )
+
+            XCTAssertEqual(result.summary.count(for: .symbolicLink), 2)
+            XCTAssertEqual(result.summary.count(for: .oversized), 0)
+            XCTAssertTrue(result.root.flattened.filter { !$0.isDirectory }.isEmpty)
+        }
+    }
+
+    func testLoadReportsWhyFilesWereSkipped() throws {
+        try withTemporaryDirectory { root in
+            try writeData(at: root.appendingPathComponent("binary.bin"), data: Data([0, 1, 2]))
+            try writeData(at: root.appendingPathComponent("invalid.swift"), data: Data([0xFF, 0xFE]))
+            try writeFile(at: root.appendingPathComponent("large.swift"), contents: String(repeating: "x", count: 2048))
+            try writeFile(at: root.appendingPathComponent(".hidden.swift"), contents: "hidden")
+            try writeFile(at: root.appendingPathComponent("excluded.log"), contents: "excluded")
+            try writeFile(at: root.appendingPathComponent("disallowed.txt"), contents: "disallowed")
+
+            let result = try TreeLoader().load(
+                rootURL: root,
+                allowList: ["swift", "bin"],
+                excludeList: ["log"],
+                maxFileSizeKB: 1,
+                skipHidden: true
+            )
+
+            XCTAssertEqual(result.summary.count(for: .binary), 1)
+            XCTAssertEqual(result.summary.count(for: .unreadable), 1)
+            XCTAssertEqual(result.summary.count(for: .oversized), 1)
+            XCTAssertEqual(result.summary.count(for: .hidden), 1)
+            XCTAssertEqual(result.summary.count(for: .excluded), 1)
+            XCTAssertEqual(result.summary.count(for: .disallowed), 1)
+            XCTAssertEqual(result.summary.skippedCount, 6)
+        }
+    }
+
     func testLoadTreeAppliesFiltersAndSkipsBinaryAndLargeFiles() throws {
         try withTemporaryDirectory { root in
             try writeFile(at: root.appendingPathComponent("app.js"), contents: "console.log('ok')")

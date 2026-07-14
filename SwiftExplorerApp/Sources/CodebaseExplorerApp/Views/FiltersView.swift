@@ -1,15 +1,32 @@
 import SwiftUI
 
-struct FiltersView: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+struct FilterEditorValues: Equatable {
+    var allowList: String
+    var excludeList: String
+}
 
+enum FilterEditorAction: Equatable {
+    case cancel
+    case apply
+}
+
+enum FilterEditorPolicy {
+    static func resolvedValues(
+        original: FilterEditorValues,
+        draft: FilterEditorValues,
+        action: FilterEditorAction
+    ) -> FilterEditorValues {
+        action == .apply ? draft : original
+    }
+}
+
+struct FiltersView: View {
     @Binding var allowList: String
     @Binding var excludeList: String
     @Binding var maxFileSizeKB: Double
     @Binding var skipHidden: Bool
     var onApply: () -> Void
 
-    @State private var applyDebounce: DispatchWorkItem?
     @State private var showFilterSheet = false
 
     var body: some View {
@@ -25,6 +42,7 @@ struct FiltersView: View {
                 }
                 .buttonStyle(.bordered)
                 .help("Open filter editor")
+                .accessibilityHint("Opens a larger editor for include and exclude extensions")
             }
 
             ViewThatFits(in: .horizontal) {
@@ -36,16 +54,12 @@ struct FiltersView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        .padding(12)
-        .appSurface(cornerRadius: 12)
-        .hoverLift()
-        .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.86), value: skipHidden)
+        .padding(.vertical, 4)
         .sheet(isPresented: $showFilterSheet) {
             FilterEditorSheet(
                 allowList: $allowList,
                 excludeList: $excludeList,
                 onApply: {
-                    applyDebounce?.cancel()
                     onApply()
                 }
             )
@@ -109,11 +123,7 @@ struct FiltersView: View {
                 .foregroundStyle(.secondary)
             TextField(placeholder, text: text)
                 .textFieldStyle(.roundedBorder)
-                .onSubmit {
-                    applyDebounce?.cancel()
-                    onApply()
-                }
-                .onChange(of: text.wrappedValue) { _ in scheduleApply() }
+                .onSubmit(onApply)
                 .frame(minWidth: 220)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -141,6 +151,13 @@ struct FiltersView: View {
                     .textFieldStyle(.roundedBorder)
                 Spacer(minLength: 0)
             }
+
+            if case let .invalid(message) = AppPreferences.validate(maxFileSizeKB: maxFileSizeKB) {
+                Label(message, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .accessibilityLabel("Invalid maximum file size. \(message)")
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -163,17 +180,20 @@ struct FiltersView: View {
             }
             .buttonStyle(.borderedProminent)
             .keyboardShortcut(.return, modifiers: [.command])
+            .disabled(AppPreferences.validate(maxFileSizeKB: maxFileSizeKB) != .valid)
+            .help(applyHelp)
+            .accessibilityHint(applyHelp)
         }
         .frame(width: 210, alignment: .leading)
     }
 
-    // MARK: - Helpers
-
-    private func scheduleApply() {
-        applyDebounce?.cancel()
-        let work = DispatchWorkItem { onApply() }
-        applyDebounce = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
+    private var applyHelp: String {
+        switch AppPreferences.validate(maxFileSizeKB: maxFileSizeKB) {
+        case .valid:
+            "Apply filters and refresh the workspace"
+        case let .invalid(message):
+            message
+        }
     }
 }
 
@@ -184,6 +204,21 @@ private struct FilterEditorSheet: View {
     @Binding var excludeList: String
     var onApply: () -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var draft: FilterEditorValues
+
+    init(
+        allowList: Binding<String>,
+        excludeList: Binding<String>,
+        onApply: @escaping () -> Void
+    ) {
+        _allowList = allowList
+        _excludeList = excludeList
+        self.onApply = onApply
+        _draft = State(initialValue: FilterEditorValues(
+            allowList: allowList.wrappedValue,
+            excludeList: excludeList.wrappedValue
+        ))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -194,7 +229,7 @@ private struct FilterEditorSheet: View {
                 Text("Only include extensions (comma / space separated)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                TextEditor(text: $allowList)
+                TextEditor(text: $draft.allowList)
                     .frame(minHeight: 70)
                     .font(.body.monospaced())
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(.secondary.opacity(0.25)))
@@ -204,7 +239,7 @@ private struct FilterEditorSheet: View {
                 Text("Exclude extensions (comma / space separated)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                TextEditor(text: $excludeList)
+                TextEditor(text: $draft.excludeList)
                     .frame(minHeight: 70)
                     .font(.body.monospaced())
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(.secondary.opacity(0.25)))
@@ -212,15 +247,32 @@ private struct FilterEditorSheet: View {
 
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }
+                Button("Cancel") { finish(.cancel) }
                 Button("Apply") {
-                    onApply()
-                    dismiss()
+                    finish(.apply)
                 }
                 .keyboardShortcut(.defaultAction)
             }
         }
         .padding(18)
         .frame(minWidth: 420)
+        .onAppear {
+            draft = FilterEditorValues(allowList: allowList, excludeList: excludeList)
+        }
+    }
+
+    private func finish(_ action: FilterEditorAction) {
+        let original = FilterEditorValues(allowList: allowList, excludeList: excludeList)
+        let resolved = FilterEditorPolicy.resolvedValues(
+            original: original,
+            draft: draft,
+            action: action
+        )
+        if action == .apply {
+            allowList = resolved.allowList
+            excludeList = resolved.excludeList
+            onApply()
+        }
+        dismiss()
     }
 }
