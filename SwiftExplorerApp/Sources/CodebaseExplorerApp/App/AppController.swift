@@ -93,13 +93,13 @@ final class AppController: ObservableObject {
         )
     }
 
-    static func live() -> AppController {
-        let preferences = AppPreferences()
+    static func live(dependencies: AppDependencies = AppDependencies()) -> AppController {
+        let preferences = AppPreferences(defaults: dependencies.defaults)
         return AppController(
             preferences: preferences,
             workspace: WorkspaceStore(),
             output: OutputStore(
-                drafts: ClipboardDraftStore(),
+                drafts: ClipboardDraftStore(baseDirectory: dependencies.draftBaseDirectory),
                 clipboard: SystemClipboardWriter()
             ),
             folderPicker: Self.presentOpenPanel,
@@ -177,7 +177,14 @@ final class AppController: ObservableObject {
 
     private func performScan(rootURL: URL) async {
         let snapshot = preferences.values
+        AppLog.scan.info("Workspace scan started")
         await workspace.scan(rootURL: rootURL, preferences: snapshot)
+        let acceptedCount = workspace.allFiles.count
+        let selectedCount = workspace.selectedFiles.count
+        let skippedCount = workspace.summary.skippedCount
+        AppLog.scan.info(
+            "Workspace scan finished accepted=\(acceptedCount, privacy: .public) selected=\(selectedCount, privacy: .public) skipped=\(skippedCount, privacy: .public)"
+        )
     }
 
     private func beginScan(rootURL: URL) {
@@ -211,7 +218,6 @@ final class AppController: ObservableObject {
 
         output.$status
             .compactMap(\.self)
-            .removeDuplicates()
             .sink { [weak self] status in
                 self?.displayStatus = status
             }

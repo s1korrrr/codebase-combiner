@@ -1,0 +1,1 @@
+This hidden fixture must remain excluded while Skip hidden files is enabled.

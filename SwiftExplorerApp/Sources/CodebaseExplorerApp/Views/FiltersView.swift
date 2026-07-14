@@ -1,5 +1,25 @@
 import SwiftUI
 
+struct FilterEditorValues: Equatable {
+    var allowList: String
+    var excludeList: String
+}
+
+enum FilterEditorAction: Equatable {
+    case cancel
+    case apply
+}
+
+enum FilterEditorPolicy {
+    static func resolvedValues(
+        original: FilterEditorValues,
+        draft: FilterEditorValues,
+        action: FilterEditorAction
+    ) -> FilterEditorValues {
+        action == .apply ? draft : original
+    }
+}
+
 struct FiltersView: View {
     @Binding var allowList: String
     @Binding var excludeList: String
@@ -184,6 +204,21 @@ private struct FilterEditorSheet: View {
     @Binding var excludeList: String
     var onApply: () -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var draft: FilterEditorValues
+
+    init(
+        allowList: Binding<String>,
+        excludeList: Binding<String>,
+        onApply: @escaping () -> Void
+    ) {
+        _allowList = allowList
+        _excludeList = excludeList
+        self.onApply = onApply
+        _draft = State(initialValue: FilterEditorValues(
+            allowList: allowList.wrappedValue,
+            excludeList: excludeList.wrappedValue
+        ))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -194,7 +229,7 @@ private struct FilterEditorSheet: View {
                 Text("Only include extensions (comma / space separated)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                TextEditor(text: $allowList)
+                TextEditor(text: $draft.allowList)
                     .frame(minHeight: 70)
                     .font(.body.monospaced())
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(.secondary.opacity(0.25)))
@@ -204,7 +239,7 @@ private struct FilterEditorSheet: View {
                 Text("Exclude extensions (comma / space separated)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                TextEditor(text: $excludeList)
+                TextEditor(text: $draft.excludeList)
                     .frame(minHeight: 70)
                     .font(.body.monospaced())
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(.secondary.opacity(0.25)))
@@ -212,15 +247,32 @@ private struct FilterEditorSheet: View {
 
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }
+                Button("Cancel") { finish(.cancel) }
                 Button("Apply") {
-                    onApply()
-                    dismiss()
+                    finish(.apply)
                 }
                 .keyboardShortcut(.defaultAction)
             }
         }
         .padding(18)
         .frame(minWidth: 420)
+        .onAppear {
+            draft = FilterEditorValues(allowList: allowList, excludeList: excludeList)
+        }
+    }
+
+    private func finish(_ action: FilterEditorAction) {
+        let original = FilterEditorValues(allowList: allowList, excludeList: excludeList)
+        let resolved = FilterEditorPolicy.resolvedValues(
+            original: original,
+            draft: draft,
+            action: action
+        )
+        if action == .apply {
+            allowList = resolved.allowList
+            excludeList = resolved.excludeList
+            onApply()
+        }
+        dismiss()
     }
 }

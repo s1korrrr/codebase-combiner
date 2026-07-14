@@ -356,6 +356,41 @@ final class AppCommandStateTests: XCTestCase {
         XCTAssertEqual(loadCount, 3)
         XCTAssertEqual(receivedPreferences?.excludeList, "png,zip")
     }
+
+    func testRepeatedSuccessfulRebuildReplacesBuildingStatusWithSuccess() async throws {
+        let rootURL = URL(fileURLWithPath: "/repeated-success-status")
+        let builder = ControlledControllerOutputBuilder()
+        let output = OutputStore(
+            drafts: ControllerDraftStore(),
+            clipboard: ControllerClipboard(),
+            builder: builder
+        )
+        let defaultsName = "repeated-success-status-tests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: defaultsName))
+        defer { defaults.removePersistentDomain(forName: defaultsName) }
+        let controller = AppController(
+            preferences: AppPreferences(defaults: defaults),
+            workspace: WorkspaceStore(loader: RecordingControllerWorkspaceLoader(result: controllerTreeResult(rootURL: rootURL))),
+            output: output,
+            folderPicker: { nil },
+            saveDestinationPicker: { _ in nil }
+        )
+
+        await controller.scan(rootURL: rootURL)
+        await builder.waitForRequest(count: 1)
+        await builder.completeRequest(at: 0)
+        await waitUntilController { controller.displayStatus == "Saved recoverable output." }
+
+        output.promptPrefix = "Use the latest prompt."
+        await builder.waitForRequest(count: 2)
+        XCTAssertEqual(controller.displayStatus, "Building combined output…")
+
+        await builder.completeRequest(at: 1)
+        await waitUntilController { controller.commandState.canExport }
+        await Task.yield()
+
+        XCTAssertEqual(controller.displayStatus, "Saved recoverable output.")
+    }
 }
 
 private func controllerTreeResult(rootURL: URL) -> TreeLoadResult {
