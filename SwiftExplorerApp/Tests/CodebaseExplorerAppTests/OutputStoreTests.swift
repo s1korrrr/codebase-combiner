@@ -713,7 +713,9 @@ private actor RetryRaceDraftStore: DraftPersisting {
     private var retryContinuation: CheckedContinuation<Void, Never>?
     private(set) var currentDraft: ClipboardDraft?
 
-    func load() async throws -> ClipboardDraft? { currentDraft }
+    func load() async throws -> ClipboardDraft? {
+        currentDraft
+    }
 
     func save(_ draft: ClipboardDraft) async throws {
         saveCount += 1

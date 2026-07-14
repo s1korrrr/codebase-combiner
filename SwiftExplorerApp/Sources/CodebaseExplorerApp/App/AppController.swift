@@ -24,9 +24,18 @@ struct AppCommandState: Equatable {
         self.hasRecoveredOutput = hasRecoveredOutput
     }
 
-    var canRefresh: Bool { hasWorkspace && !isScanning }
-    var canExport: Bool { hasSelection && hasFreshOutput }
-    var canCopyRecovered: Bool { hasRecoveredOutput }
+    var canRefresh: Bool {
+        hasWorkspace && !isScanning
+    }
+
+    var canExport: Bool {
+        hasSelection && hasFreshOutput
+    }
+
+    var canCopyRecovered: Bool {
+        hasRecoveredOutput
+    }
+
     var copyHelp: String {
         if !hasSelection {
             return "Select at least one file to copy the combined output."

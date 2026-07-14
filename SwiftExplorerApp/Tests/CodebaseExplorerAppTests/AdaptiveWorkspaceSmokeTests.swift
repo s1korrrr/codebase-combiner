@@ -124,7 +124,7 @@ final class AdaptiveWorkspaceSmokeTests: XCTestCase {
         XCTAssertNil(output.currentFormat)
     }
 
-    func testAdaptiveViewsConstructForEveryPolicyWhileRecoveredPayloadStaysConcealed() async {
+    func testAdaptiveViewsConstructForEveryPolicyWhileRecoveredPayloadStaysConcealed() async throws {
         let output = OutputStore(
             drafts: SmokeDraftStore(draft: ClipboardDraft(
                 text: "private source",
@@ -137,8 +137,8 @@ final class AdaptiveWorkspaceSmokeTests: XCTestCase {
             )),
             clipboard: SmokeClipboard()
         )
-        let controller = AppController(
-            preferences: AppPreferences(defaults: UserDefaults(suiteName: #function)!),
+        let controller = try AppController(
+            preferences: AppPreferences(defaults: XCTUnwrap(UserDefaults(suiteName: #function))),
             workspace: WorkspaceStore(),
             output: output,
             folderPicker: { nil },
@@ -351,9 +351,17 @@ private actor SmokeDraftStore: DraftPersisting {
         self.draft = draft
     }
 
-    func load() async throws -> ClipboardDraft? { draft }
-    func save(_ draft: ClipboardDraft) async throws { self.draft = draft }
-    func clear() async throws { draft = nil }
+    func load() async throws -> ClipboardDraft? {
+        draft
+    }
+
+    func save(_ draft: ClipboardDraft) async throws {
+        self.draft = draft
+    }
+
+    func clear() async throws {
+        draft = nil
+    }
 }
 
 @MainActor
