@@ -10,67 +10,70 @@
 - Offline behavior: fully local; no network is required for scanning, combining, copying, saving, or restoring the last payload.
 - Data handled: user-selected local source files, prompt prefix text, preferences, and the last generated combined payload.
 - Privacy posture: local-first, no tracking, no analytics, no collected data; saved payload is user content stored locally in Application Support.
-- V1 scope: SwiftPM macOS app, native UI, settings, support link, persistence, tests, local App Store bundle validation.
+- V1 scope: SwiftPM macOS app, adaptive native workspace, canonical Settings, local recovery, tests, isolated E2E, and ad-hoc App Store-style bundle validation.
 - Explicitly out of scope: cloud sync, account system, AI model calls, paid unlocks, automatic upload to App Store Connect.
 
 ## Architecture
 
-- Scene model: `WindowGroup` for the main app plus `Settings` and a dedicated settings window.
-- Window roles: primary workspace window and settings utility window.
-- Layout model: sidebar tree plus main prompt/controls/selection/stat surface.
-- State ownership: view state in `ContentView`, durable preferences through `@AppStorage`, durable last payload through `ClipboardDraftStore`.
-- Persistence: preferences in UserDefaults, last ready combined payload as atomic JSON under Application Support.
-- Services: `TreeLoader`, `TokenEstimator`, `CombinedOutputBuilder`, `ClipboardDraftStore`.
+- Scene model: one `WindowGroup` for the workspace plus one canonical `Settings` scene.
+- Window roles: primary workspace window and standard Settings window.
+- Layout model: adaptive workspace sidebar, preparation surface, and output inspector. The two outer pane hosts stay structurally mounted and use transform/opacity for visibility because changing AppKit-backed split/toolbar structure crashed the audited macOS 27 beta host.
+- State ownership: `AppController` coordinates `AppPreferences`, `WorkspaceStore`, and `OutputStore`; views retain only presentation state such as sidebar visibility.
+- Persistence: preferences in UserDefaults; the last ready combined payload remains an atomic JSON draft under Application Support with its existing schema.
+- Services: `TreeLoader`, `TokenEstimator`, `CombinedOutputBuilder`, `ClipboardDraftStore`, injected clipboard/save boundaries, and typed metadata-only telemetry.
 - App Intents / Foundation Models / advanced capabilities: not used in v1.
-- Folder/module structure: `Models/`, `Services/`, `Support/`, `Views/`, and XCTest targets.
+- Folder/module structure: `App/`, `Models/`, `Stores/`, `Services/`, `Support/`, `Views/`, and focused XCTest targets.
 
 ## Build And Run
 
 - Project type: SwiftPM executable plus VS Code extension package.
 - Build command: `cd SwiftExplorerApp && swift build`.
 - Run command: `cd SwiftExplorerApp && swift run`.
-- `script/build_and_run.sh` status: available; `./script/build_and_run.sh --verify` builds the local App Store-style bundle and verifies launch.
+- `script/build_and_run.sh` status: available; `--verify` owns and reaps one exact production PID, `--e2e` runs a separate sandboxed fixture host, and `--clean-e2e-state` removes app-owned E2E state and temporary artifacts.
 - Codex Run action status: `.codex/environments/environment.toml` points Run to `./script/build_and_run.sh --verify`.
 
 ## Design System
 
-- Native structures: SwiftUI sidebar list, settings scene, forms, segmented picker, standard buttons, macOS materials.
-- Adaptive states: empty folder, scanning, loaded, no selection, copy toast, saved last payload, settings.
-- Visual style: semantic colors, regular materials, compact desktop controls, subtle hover and surface elevation.
-- Motion rules: state-change animations are short and respect Reduce Motion.
-- Accessibility requirements: labeled controls, keyboard shortcuts for choose/refresh/copy/save, visible selection and focus-compatible native controls.
-- Empty/loading/error/offline/permission states: empty and loading states are visible; scan/save errors surface in the status label; offline is normal operation.
+- Native structures: workspace hierarchy, forms, segmented output picker, standard menus/toolbars/buttons, standard Settings, and semantic macOS materials.
+- Adaptive states: 960×640 compact, 1180×760 regular, 1440×900 wide, independent sidebar/inspector visibility, empty, scanning, partial scan, no selection, current output, concealed recovery, and settings.
+- Visual style: semantic macOS 13 baseline; one bounded `FunctionalChrome` modifier uses macOS 26 glass only when available and falls back to opaque/regular materials for reduced transparency or increased contrast.
+- Motion rules: repeated workflow actions remain immediate; pane transitions are non-structural and Reduce Motion-safe.
+- Accessibility requirements: named controls, prerequisite help for disabled actions, keyboard/menu parity, safe Cancel focus for destructive recovery clear, and accessibility-hidden collapsed panes.
+- Empty/loading/error/offline/permission states: empty, loading, invalid settings, partial scan, scan failure, persistence failure, copy/save failure, and recovery failure are explicit; offline is normal operation.
 
 ## Test Strategy
 
-- Unit tests: token estimator, tree loader, combined output builder, clipboard draft store.
-- Integration tests or mocks: file-system backed tree loader and draft-store tests use temporary directories.
-- UI/manual smoke: `./script/build_and_run.sh --verify` and packaged `.app` launch smoke.
-- Release smoke: `Packaging/AppStore/build_app_store_package.sh --skip-signing`, plist validation, codesign entitlement inspection.
-- Commands: `swiftformat --lint .`, `swift build`, `swift test`, `npm test`, `npm run lint`, `npm run format:check`.
+- Unit tests: preference validation, adaptive/pane policies, token estimation, command state, async workspace/output ordering, recovery privacy, telemetry shape, tree loading, output formatting, and dependency selection.
+- Integration tests or mocks: temporary-directory loader/draft tests plus injected filesystem, clipboard, save, output-build, and telemetry boundaries.
+- UI/manual smoke: exact-PID `./script/build_and_run.sh --verify` plus the real sandboxed interaction matrix documented in `docs/audit/codebase-combiner-e2e-audit-2026-07-13.md`.
+- Release smoke: `Packaging/AppStore/build_app_store_package.sh --skip-signing`, strict signature/plist/privacy/entitlement/minimum-OS inspection, and bounded 1,500-file Release performance.
+- Commands: `swiftformat --lint .`, `swift test`, `swift build -c release -Xswiftc -warnings-as-errors`, `npm test`, `npm run lint`, `npm run format:check`, `npm run package`, shell contract/syntax checks, package assembly, and exact-PID launch verification.
 
 ## Observability
 
 - Logger subsystem: `com.s1korrrr.codebasecombiner`.
 - Categories: lifecycle, scan, export, persistence.
-- Key lifecycle/action events: app launch, scan start/success/failure, copy/save actions, draft restore/save/clear failures.
-- Sensitive logging exclusions: do not log raw file contents, combined payload text, secrets, or private paths in persistent logs.
+- Key lifecycle/action events: app launch/window setup, typed scan outcome, recovery load/save/clear outcome, and copy/save outcome with counts only.
+- Sensitive logging exclusions: no raw file content, prompt text, combined/recovered payload, clipboard content, root/destination path, secret, or credential.
 
 ## App Store Readiness
 
 - Bundle ID: `com.s1korrrr.codebasecombiner`.
-- Signing team: blocked on installing distribution certificates/provisioning profile.
-- Sandbox/entitlements: App Sandbox and user-selected read/write.
-- Privacy manifest: present; declares UserDefaults reason, no tracking, no collected data.
-- Privacy labels: should be no tracking/no collected data unless future telemetry or networking is added.
-- Assets: app icon generated from `assets/icon.jpg`; screenshot exists at `docs/screenshots/macos-app.png`.
-- Metadata: README/INSTALL contain packaging notes; App Store Connect metadata still needs final copy and URLs.
+- Signing team: valid distribution and installer identities were detected locally on 2026-07-14, but the owner team/account path and matching Mac App Store provisioning profile were not verified together.
+- Sandbox/entitlements: strict ad-hoc signature verifies with App Sandbox and user-selected read/write only; no profile is embedded.
+- Privacy manifest: parses; declares UserDefaults reason `CA92.1`, no tracking, and no collected data.
+- Privacy labels: must be entered and owner-confirmed in App Store Connect; they should remain no tracking/no collected data unless the product changes.
+- Assets: the bundle contains a generated `.icns`; current local audit screenshots are under `docs/audit/codebase-combiner-e2e-2026-07-14/`, but final App Store sizes/localizations are not prepared.
+- Metadata: README/INSTALL are current; App Store Connect name/subtitle/description/keywords, support/privacy URLs, age rating, screenshots, and legal declarations remain owner work.
 - Review notes: app is local-first and needs no demo account.
-- Known blockers: App Store Connect app record, Mac App Store distribution identity, installer identity, provisioning profile, final metadata/screenshots.
+- Known blockers: matching provisioning profile, signed installer package, App Store Connect app record, final metadata/screenshots/privacy/legal declarations, upload, and Apple review. Xcode 27 is separately required before adding or proving macOS 27 SDK-only features.
 
 ## Iteration Log
 
-| Date       | Gate               | Change                                                                | Verification                                                                     | Next blocker              |
-| ---------- | ------------------ | --------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------- |
-| 2026-06-29 | Production quality | Added file-backed last-ready-payload persistence and restore/copy UI. | `swift test` passed 8 tests; `npm test`; `npm run lint`; `npm run format:check`. | App Store signing assets. |
-| 2026-06-29 | Build/run          | Added `script/build_and_run.sh --verify` and Codex Run action.        | `./script/build_and_run.sh --verify` launched packaged app.                      | None for local smoke.     |
+| Date       | Gate                | Change                                                                                                       | Verification                                                                            | Next blocker                                    |
+| ---------- | ------------------- | ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| 2026-06-29 | Production quality  | Added file-backed last-ready-payload persistence and restore/copy UI.                                        | `swift test` passed 8 tests; `npm test`; `npm run lint`; `npm run format:check`.        | App Store signing assets.                       |
+| 2026-06-29 | Build/run           | Added `script/build_and_run.sh --verify` and Codex Run action.                                               | `./script/build_and_run.sh --verify` launched packaged app.                             | None for local smoke.                           |
+| 2026-07-14 | Native architecture | Extracted focused stores/controller and rebuilt the adaptive workspace with concealed recovery.              | 86 XCTest cases, Release warnings-as-errors build, and real sandbox interaction matrix. | Owner-controlled App Store gates.               |
+| 2026-07-14 | Package evidence    | Validated macOS 13.0 minimum, SDK 26.5, privacy manifest, strict ad-hoc signature, and minimal entitlements. | `build_app_store_package.sh --skip-signing`, `plutil`, `codesign`, and `vtool`.         | Matching profile and signed installer package.  |
+| 2026-07-14 | Extension package   | Corrected the VS Code publisher identifier and excluded non-extension artifacts.                             | `npm run package`: 73 files, 153.18 KB.                                                 | Marketplace ownership/publish remains external. |

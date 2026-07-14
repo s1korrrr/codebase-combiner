@@ -1,8 +1,16 @@
 .github/**
 .vscode/**
+.codex/**
+.superpowers/**
+Packaging/**
 SwiftExplorerApp/**
+dist/**
+docs/**
+script/**
+test/**
 node_modules/.bin/**
 assets/icon.jpg
+image.png
 AGENTS.md
 PLAN.md
 TODO.md
@@ -17,5 +25,4 @@ SECURITY.md
 .prettierrc
 .swiftformat
 package-lock.json
-test/**
 *.vsix
