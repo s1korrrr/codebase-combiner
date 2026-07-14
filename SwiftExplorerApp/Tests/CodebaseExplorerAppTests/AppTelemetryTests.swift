@@ -4,7 +4,7 @@ import XCTest
 
 @MainActor
 final class AppTelemetryTests: XCTestCase {
-    func testControllerRecordsTheAcceptedScanOutcomeReturnedByTheWorkspace() async throws {
+    func testControllerRecordsTheAcceptedScanOutcomeReturnedByTheWorkspace() async {
         let telemetry = RecordingTelemetrySink()
         let result = telemetryFixture()
         let controller = makeController(
@@ -172,9 +172,17 @@ private actor TelemetryDraftStore: DraftPersisting {
         self.draft = draft
     }
 
-    func load() async throws -> ClipboardDraft? { draft }
-    func save(_ draft: ClipboardDraft) async throws { self.draft = draft }
-    func clear() async throws { draft = nil }
+    func load() async throws -> ClipboardDraft? {
+        draft
+    }
+
+    func save(_ draft: ClipboardDraft) async throws {
+        self.draft = draft
+    }
+
+    func clear() async throws {
+        draft = nil
+    }
 }
 
 @MainActor

@@ -68,7 +68,7 @@ final class AppCommandStateTests: XCTestCase {
         XCTAssertEqual(building.saveHelp, "Wait for the combined output to finish building.")
     }
 
-    func testRecoveredOutputCopyCapabilityIgnoresCurrentSelectionAndPayload() async {
+    func testRecoveredOutputCopyCapabilityIgnoresCurrentSelectionAndPayload() async throws {
         let clipboard = ControllerClipboard()
         let recoveredDraft = ClipboardDraft(
             text: "recovered source",
@@ -83,8 +83,8 @@ final class AppCommandStateTests: XCTestCase {
             drafts: ControllerDraftStore(draft: recoveredDraft),
             clipboard: clipboard
         )
-        let controller = AppController(
-            preferences: AppPreferences(defaults: UserDefaults(suiteName: "recovered-command-tests")!),
+        let controller = try AppController(
+            preferences: AppPreferences(defaults: XCTUnwrap(UserDefaults(suiteName: "recovered-command-tests"))),
             workspace: WorkspaceStore(loader: RecordingControllerWorkspaceLoader(result: controllerTreeResult(
                 rootURL: URL(fileURLWithPath: "/recovered-command")
             ))),
@@ -170,7 +170,7 @@ final class AppCommandStateTests: XCTestCase {
         XCTAssertFalse(controller.commandState.canExport)
     }
 
-    func testExportStaysDisabledUntilTheLatestOutputBuildCompletes() async {
+    func testExportStaysDisabledUntilTheLatestOutputBuildCompletes() async throws {
         let rootURL = URL(fileURLWithPath: "/pending-build")
         let file = FileNode(
             name: "Current.swift",
@@ -203,8 +203,8 @@ final class AppCommandStateTests: XCTestCase {
             clipboard: clipboard,
             builder: builder
         )
-        let controller = AppController(
-            preferences: AppPreferences(defaults: UserDefaults(suiteName: "pending-build-tests")!),
+        let controller = try AppController(
+            preferences: AppPreferences(defaults: XCTUnwrap(UserDefaults(suiteName: "pending-build-tests"))),
             workspace: workspace,
             output: output,
             folderPicker: { nil },
@@ -247,7 +247,7 @@ final class AppCommandStateTests: XCTestCase {
         XCTAssertTrue(output.currentPayload?.contains("Use the new revision.") == true)
     }
 
-    func testLatestWorkspaceFailureOverridesPriorOutputSuccessStatus() async {
+    func testLatestWorkspaceFailureOverridesPriorOutputSuccessStatus() async throws {
         let rootURL = URL(fileURLWithPath: "/status-recency")
         let result = controllerTreeResult(rootURL: rootURL)
         let loader = FailingRefreshControllerWorkspaceLoader(firstResult: result)
@@ -255,8 +255,8 @@ final class AppCommandStateTests: XCTestCase {
             drafts: ControllerDraftStore(),
             clipboard: ControllerClipboard()
         )
-        let controller = AppController(
-            preferences: AppPreferences(defaults: UserDefaults(suiteName: "status-recency-tests")!),
+        let controller = try AppController(
+            preferences: AppPreferences(defaults: XCTUnwrap(UserDefaults(suiteName: "status-recency-tests"))),
             workspace: WorkspaceStore(loader: loader),
             output: output,
             folderPicker: { nil },
@@ -481,7 +481,9 @@ private actor FailingRefreshControllerWorkspaceLoader: WorkspaceLoading {
 private enum ControllerLoaderError: LocalizedError {
     case refreshFailed
 
-    var errorDescription: String? { "Refresh failed" }
+    var errorDescription: String? {
+        "Refresh failed"
+    }
 }
 
 private actor ControllerDraftStore: DraftPersisting {
@@ -491,9 +493,17 @@ private actor ControllerDraftStore: DraftPersisting {
         self.draft = draft
     }
 
-    func load() async throws -> ClipboardDraft? { draft }
-    func save(_ draft: ClipboardDraft) async throws { self.draft = draft }
-    func clear() async throws { draft = nil }
+    func load() async throws -> ClipboardDraft? {
+        draft
+    }
+
+    func save(_ draft: ClipboardDraft) async throws {
+        self.draft = draft
+    }
+
+    func clear() async throws {
+        draft = nil
+    }
 }
 
 @MainActor

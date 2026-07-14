@@ -83,7 +83,9 @@ struct WorkspacePaneFrame: Equatable {
     let x: Double
     let width: Double
 
-    var maxX: Double { x + width }
+    var maxX: Double {
+        x + width
+    }
 
     func intersects(_ other: WorkspacePaneFrame) -> Bool {
         x < other.maxX && other.x < maxX
@@ -142,7 +144,6 @@ struct FunctionalChrome: ViewModifier {
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
-    @ViewBuilder
     func body(content: Content) -> some View {
         if #available(macOS 26, *), !reduceTransparency, contrast != .increased {
             content

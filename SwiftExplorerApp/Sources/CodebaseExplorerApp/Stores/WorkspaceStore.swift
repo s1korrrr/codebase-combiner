@@ -53,18 +53,53 @@ final class WorkspaceStore: ObservableObject {
 
     @Published private(set) var state = State()
 
-    var rootURL: URL? { state.rootURL }
-    var rootNode: FileNode? { state.rootNode }
-    var allFiles: [FileNode] { state.allFiles }
-    var selectedIDs: Set<String> { state.selectedIDs }
-    var selectedFiles: [FileNode] { state.selectedFiles }
-    var selectedBytes: Int { state.selectedBytes }
-    var selectedTokens: Int { state.selectedTokens }
-    var summary: ScanSummary { state.summary }
-    var isScanning: Bool { state.isScanning }
-    var status: String { state.status }
-    var scanFailure: WorkspaceScanFailure? { state.scanFailure }
-    var canRetryFailedScan: Bool { failedRequest != nil && !state.isScanning }
+    var rootURL: URL? {
+        state.rootURL
+    }
+
+    var rootNode: FileNode? {
+        state.rootNode
+    }
+
+    var allFiles: [FileNode] {
+        state.allFiles
+    }
+
+    var selectedIDs: Set<String> {
+        state.selectedIDs
+    }
+
+    var selectedFiles: [FileNode] {
+        state.selectedFiles
+    }
+
+    var selectedBytes: Int {
+        state.selectedBytes
+    }
+
+    var selectedTokens: Int {
+        state.selectedTokens
+    }
+
+    var summary: ScanSummary {
+        state.summary
+    }
+
+    var isScanning: Bool {
+        state.isScanning
+    }
+
+    var status: String {
+        state.status
+    }
+
+    var scanFailure: WorkspaceScanFailure? {
+        state.scanFailure
+    }
+
+    var canRetryFailedScan: Bool {
+        failedRequest != nil && !state.isScanning
+    }
 
     private(set) var activeRequestID: UUID?
     private var pendingRootURL: URL?

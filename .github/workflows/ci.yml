@@ -7,6 +7,9 @@ on:
 jobs:
   build-test:
     runs-on: macos-latest
+    env:
+      SWIFTFORMAT_VERSION: 0.61.1
+      SWIFTFORMAT_SHA256: b990400779aceb7d7020796eb9ba814d4480543f671d38fc0ff48cb72f04c584
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,10 +33,20 @@ jobs:
         run: npm test
 
       - name: Install SwiftFormat
-        run: brew install swiftformat
+        run: |
+          archive="$RUNNER_TEMP/swiftformat.zip"
+          install_dir="$RUNNER_TEMP/swiftformat"
+          curl --fail --location --silent --show-error \
+            --output "$archive" \
+            "https://github.com/nicklockwood/SwiftFormat/releases/download/$SWIFTFORMAT_VERSION/swiftformat.zip"
+          echo "$SWIFTFORMAT_SHA256  $archive" | shasum --algorithm 256 --check
+          unzip -q "$archive" -d "$install_dir"
+          echo "$install_dir" >> "$GITHUB_PATH"
 
       - name: SwiftFormat lint
-        run: swiftformat --lint .
+        run: |
+          test "$(swiftformat --version)" = "$SWIFTFORMAT_VERSION"
+          swiftformat --lint . --disable redundantSendable
 
       - name: Swift tests
         run: cd SwiftExplorerApp && swift test

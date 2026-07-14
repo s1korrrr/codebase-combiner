@@ -14,9 +14,9 @@ final class AppPreferencesTests: XCTestCase {
     }
 
     @MainActor
-    func testLoadsAndPersistsValuesUsingExistingKeys() {
+    func testLoadsAndPersistsValuesUsingExistingKeys() throws {
         let suiteName = "AppPreferencesTests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         defaults.set("swift,md", forKey: "cc_allowListString")

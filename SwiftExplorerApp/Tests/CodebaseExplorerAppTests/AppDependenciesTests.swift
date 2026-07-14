@@ -1,7 +1,6 @@
+@testable import CodebaseExplorerApp
 import Foundation
 import XCTest
-
-@testable import CodebaseExplorerApp
 
 @MainActor
 final class AppDependenciesTests: XCTestCase {
