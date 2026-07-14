@@ -76,6 +76,7 @@ final class AppController: ObservableObject {
 
     private let folderPicker: FolderPicker
     private let saveDestinationPicker: SaveDestinationPicker
+    private let telemetry: any AppTelemetryRecording
     private var cancellables: Set<AnyCancellable> = []
     private var scanTask: Task<Void, Never>?
     private var saveTask: Task<Void, Never>?
@@ -94,16 +95,19 @@ final class AppController: ObservableObject {
     }
 
     static func live(dependencies: AppDependencies = AppDependencies()) -> AppController {
+        let telemetry = LiveAppTelemetry.shared
         let preferences = AppPreferences(defaults: dependencies.defaults)
         return AppController(
             preferences: preferences,
             workspace: WorkspaceStore(),
             output: OutputStore(
                 drafts: ClipboardDraftStore(baseDirectory: dependencies.draftBaseDirectory),
-                clipboard: SystemClipboardWriter()
+                clipboard: SystemClipboardWriter(),
+                telemetry: telemetry
             ),
             folderPicker: Self.presentOpenPanel,
-            saveDestinationPicker: Self.presentSavePanel
+            saveDestinationPicker: Self.presentSavePanel,
+            telemetry: telemetry
         )
     }
 
@@ -112,13 +116,15 @@ final class AppController: ObservableObject {
         workspace: WorkspaceStore,
         output: OutputStore,
         folderPicker: @escaping FolderPicker,
-        saveDestinationPicker: @escaping SaveDestinationPicker
+        saveDestinationPicker: @escaping SaveDestinationPicker,
+        telemetry: any AppTelemetryRecording = LiveAppTelemetry.shared
     ) {
         self.preferences = preferences
         self.workspace = workspace
         self.output = output
         self.folderPicker = folderPicker
         self.saveDestinationPicker = saveDestinationPicker
+        self.telemetry = telemetry
         displayStatus = workspace.status
         output.format = preferences.values.outputMarkdown ? .markdown : .plainText
         bindSharedState()
@@ -170,21 +176,18 @@ final class AppController: ObservableObject {
         isInspectorPresented.toggle()
     }
 
-    func scan(rootURL: URL) async {
+    @discardableResult
+    func scan(rootURL: URL) async -> WorkspaceScanOutcome {
         preferenceRescanTask?.cancel()
-        await performScan(rootURL: rootURL)
+        return await performScan(rootURL: rootURL)
     }
 
-    private func performScan(rootURL: URL) async {
+    private func performScan(rootURL: URL) async -> WorkspaceScanOutcome {
         let snapshot = preferences.values
-        AppLog.scan.info("Workspace scan started")
-        await workspace.scan(rootURL: rootURL, preferences: snapshot)
-        let acceptedCount = workspace.allFiles.count
-        let selectedCount = workspace.selectedFiles.count
-        let skippedCount = workspace.summary.skippedCount
-        AppLog.scan.info(
-            "Workspace scan finished accepted=\(acceptedCount, privacy: .public) selected=\(selectedCount, privacy: .public) skipped=\(skippedCount, privacy: .public)"
-        )
+        telemetry.record(.scanStarted)
+        let outcome = await workspace.scan(rootURL: rootURL, preferences: snapshot)
+        telemetry.record(.scanFinished(outcome))
+        return outcome
     }
 
     private func beginScan(rootURL: URL) {
@@ -192,7 +195,7 @@ final class AppController: ObservableObject {
         scanTask?.cancel()
         scanTask = Task { [weak self] in
             guard let self else { return }
-            await performScan(rootURL: rootURL)
+            _ = await performScan(rootURL: rootURL)
         }
     }
 
@@ -293,7 +296,7 @@ final class AppController: ObservableObject {
                 return
             }
             guard let self, !Task.isCancelled else { return }
-            await performScan(rootURL: rootURL)
+            _ = await performScan(rootURL: rootURL)
         }
     }
 

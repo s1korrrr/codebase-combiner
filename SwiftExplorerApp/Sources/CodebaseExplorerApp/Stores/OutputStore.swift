@@ -18,6 +18,7 @@ final class OutputStore: ObservableObject {
     private let clipboard: any ClipboardWriting
     private let saver: any PayloadSaving
     private let builder: any OutputBuilding
+    private let telemetry: any AppTelemetryRecording
     private var buildGeneration = 0
     private var recoveryGeneration = 0
 
@@ -25,12 +26,14 @@ final class OutputStore: ObservableObject {
         drafts: any DraftPersisting,
         clipboard: any ClipboardWriting,
         saver: any PayloadSaving = FilePayloadSaver(),
-        builder: any OutputBuilding = BackgroundOutputBuilder()
+        builder: any OutputBuilding = BackgroundOutputBuilder(),
+        telemetry: any AppTelemetryRecording = LiveAppTelemetry.shared
     ) {
         persistence = OrderedDraftPersistence(drafts: drafts)
         self.clipboard = clipboard
         self.saver = saver
         self.builder = builder
+        self.telemetry = telemetry
     }
 
     var visiblePayload: String? {
@@ -82,13 +85,13 @@ final class OutputStore: ObservableObject {
             isRecoveredContentRevealed = false
             canClearRecoveredOutput = true
             status = "Saved recoverable output."
-            AppLog.persistence.info(
-                "Recovery save succeeded files=\(output.draft.fileCount, privacy: .public) bytes=\(output.draft.byteCount, privacy: .public)"
+            telemetry.record(
+                .recoverySaveSucceeded(fileCount: output.draft.fileCount, byteCount: output.draft.byteCount)
             )
         } catch {
             guard isCurrentRecovery(recoveryRevision) else { return }
             status = "Could not save the recoverable output. Check storage access and try again: \(error.localizedDescription)"
-            AppLog.persistence.error("Recovery save failed")
+            telemetry.record(.recoverySaveFailed)
         }
     }
 
@@ -102,7 +105,7 @@ final class OutputStore: ObservableObject {
             isRecoveredContentRevealed = false
             canClearRecoveredOutput = draft != nil
             status = nil
-            AppLog.persistence.info("Recovery load succeeded available=\(draft != nil, privacy: .public)")
+            telemetry.record(.recoveryLoadSucceeded(available: draft != nil))
         } catch {
             guard isCurrentRecovery(recoveryRevision) else { return }
             recoveredDraft = nil
@@ -110,7 +113,7 @@ final class OutputStore: ObservableObject {
             canClearRecoveredOutput = true
             isClearConfirmationPresented = false
             status = "Could not load the recovered output. Try again or clear it: \(error.localizedDescription)"
-            AppLog.persistence.error("Recovery load failed")
+            telemetry.record(.recoveryLoadFailed)
         }
     }
 
@@ -133,10 +136,10 @@ final class OutputStore: ObservableObject {
             let characterCount = currentPayload.count
             try clipboard.write(currentPayload)
             status = "Copied the current output."
-            AppLog.export.info("Current output copy succeeded characters=\(characterCount, privacy: .public)")
+            telemetry.record(.currentCopySucceeded(characterCount: characterCount))
         } catch {
             status = "Could not copy the current output. Check clipboard access and try again: \(error.localizedDescription)"
-            AppLog.export.error("Current output copy failed")
+            telemetry.record(.currentCopyFailed)
         }
     }
 
@@ -150,10 +153,10 @@ final class OutputStore: ObservableObject {
             let characterCount = text.count
             try clipboard.write(text)
             status = "Copied the recovered output."
-            AppLog.export.info("Recovered output copy succeeded characters=\(characterCount, privacy: .public)")
+            telemetry.record(.recoveredCopySucceeded(characterCount: characterCount))
         } catch {
             status = "Could not copy the recovered output. Check clipboard access and try again: \(error.localizedDescription)"
-            AppLog.export.error("Recovered output copy failed")
+            telemetry.record(.recoveredCopyFailed)
         }
     }
 
@@ -167,10 +170,10 @@ final class OutputStore: ObservableObject {
             let characterCount = currentPayload.count
             try await saver.save(currentPayload, to: url)
             status = "Saved the current output to \(url.lastPathComponent)."
-            AppLog.export.info("Current output save succeeded characters=\(characterCount, privacy: .public)")
+            telemetry.record(.currentSaveSucceeded(characterCount: characterCount))
         } catch {
             status = "Could not save the current output. Check the destination and try again: \(error.localizedDescription)"
-            AppLog.export.error("Current output save failed")
+            telemetry.record(.currentSaveFailed)
         }
     }
 
@@ -195,11 +198,11 @@ final class OutputStore: ObservableObject {
             canClearRecoveredOutput = false
             isClearConfirmationPresented = false
             status = "Cleared the recovered output."
-            AppLog.persistence.info("Recovery clear succeeded")
+            telemetry.record(.recoveryClearSucceeded)
         } catch {
             guard isCurrentRecovery(recoveryRevision) else { return }
             status = "Could not clear the recovered output. Check file access and try again: \(error.localizedDescription)"
-            AppLog.persistence.error("Recovery clear failed")
+            telemetry.record(.recoveryClearFailed)
         }
     }
 

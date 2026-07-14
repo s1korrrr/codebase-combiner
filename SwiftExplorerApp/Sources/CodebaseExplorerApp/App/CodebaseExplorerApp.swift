@@ -31,6 +31,8 @@ struct CodebaseExplorerApp: App {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let defaults = AppDependencies().defaults
+    private let e2eWindowSize = AppDependencies().initialWindowSize
+    private var didConfigureE2EWindow = false
 
     func applicationWillFinishLaunching(_: Notification) {
         defaults.set(false, forKey: "NSQuitAlwaysKeepsWindows")
@@ -57,6 +59,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_: Notification) {
+        if e2eWindowSize != nil {
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(windowDidBecomeKey(_:)),
+                name: NSWindow.didBecomeKeyNotification,
+                object: nil
+            )
+        }
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         AppLog.lifecycle.info("Application finished launching")
@@ -64,6 +74,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async { self.recenterOffscreenWindowsIfNeeded() }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.disableWindowRestoration() }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.recenterOffscreenWindowsIfNeeded() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { self.configureE2EWindowFrameIfNeeded() }
+    }
+
+    @objc private func windowDidBecomeKey(_ notification: Notification) {
+        configureE2EWindowFrameIfNeeded(window: notification.object as? NSWindow)
     }
 
     @MainActor
@@ -87,5 +102,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 ))
             }
         }
+    }
+
+    @MainActor
+    private func configureE2EWindowFrameIfNeeded(window providedWindow: NSWindow? = nil) {
+        guard !didConfigureE2EWindow,
+              let e2eWindowSize,
+              let window = providedWindow ?? NSApp.keyWindow ?? NSApp.windows.first(where: { $0.isVisible && $0.canBecomeMain }),
+              let visibleFrame = (window.screen ?? NSScreen.main)?.visibleFrame
+        else { return }
+
+        window.setFrame(
+            E2EWindowFramePolicy.frame(size: e2eWindowSize, visibleFrame: visibleFrame),
+            display: true,
+            animate: false
+        )
+        didConfigureE2EWindow = true
+        AppLog.lifecycle.info(
+            "Configured E2E window frame width=\(Int(window.frame.width), privacy: .public) height=\(Int(window.frame.height), privacy: .public)"
+        )
+    }
+}
+
+enum E2EWindowFramePolicy {
+    static func frame(size: CGSize, visibleFrame: CGRect) -> CGRect {
+        CGRect(
+            x: visibleFrame.midX - size.width / 2,
+            y: visibleFrame.midY - size.height / 2,
+            width: size.width,
+            height: size.height
+        )
     }
 }

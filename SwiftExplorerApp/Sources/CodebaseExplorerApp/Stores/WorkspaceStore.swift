@@ -19,6 +19,13 @@ struct LiveWorkspaceLoader: WorkspaceLoading {
     }
 }
 
+enum WorkspaceScanOutcome: Equatable, Sendable {
+    case accepted(fileCount: Int, selectedCount: Int, skippedCount: Int)
+    case rejectedInvalidMaximumFileSize
+    case failed
+    case stale
+}
+
 @MainActor
 final class WorkspaceStore: ObservableObject {
     struct State: Equatable {
@@ -55,10 +62,11 @@ final class WorkspaceStore: ObservableObject {
         self.loader = loader
     }
 
-    func scan(rootURL: URL, preferences: AppPreferences.Values) async {
+    @discardableResult
+    func scan(rootURL: URL, preferences: AppPreferences.Values) async -> WorkspaceScanOutcome {
         guard AppPreferences.validate(maxFileSizeKB: preferences.maxFileSizeKB) == .valid else {
             state.status = "Correct the maximum file size before scanning."
-            return
+            return .rejectedInvalidMaximumFileSize
         }
 
         let requestID = UUID()
@@ -72,20 +80,25 @@ final class WorkspaceStore: ObservableObject {
 
         do {
             let result = try await loader.load(rootURL: rootURL, preferences: preferences)
-            accept(result, requestID: requestID, preserveSelection: preserveSelection)
+            return accept(result, requestID: requestID, preserveSelection: preserveSelection)
         } catch {
-            guard activeRequestID == requestID else { return }
+            guard activeRequestID == requestID else { return .stale }
             activeRequestID = nil
             pendingRootURL = nil
             var failedState = state
             failedState.isScanning = false
             failedState.status = error.localizedDescription
             state = failedState
+            return .failed
         }
     }
 
-    func accept(_ result: TreeLoadResult, requestID: UUID, preserveSelection: Bool) {
-        guard activeRequestID == requestID, let acceptedRootURL = pendingRootURL else { return }
+    func accept(
+        _ result: TreeLoadResult,
+        requestID: UUID,
+        preserveSelection: Bool
+    ) -> WorkspaceScanOutcome {
+        guard activeRequestID == requestID, let acceptedRootURL = pendingRootURL else { return .stale }
 
         let files = Self.flattenFiles(result.root)
         let availableIDs = Set(files.map(\.id))
@@ -110,6 +123,11 @@ final class WorkspaceStore: ObservableObject {
         activeRequestID = nil
         pendingRootURL = nil
         state = acceptedState
+        return .accepted(
+            fileCount: files.count,
+            selectedCount: nextSelectedIDs.count,
+            skippedCount: result.summary.skippedCount
+        )
     }
 
     func toggle(node: FileNode, isOn: Bool) {

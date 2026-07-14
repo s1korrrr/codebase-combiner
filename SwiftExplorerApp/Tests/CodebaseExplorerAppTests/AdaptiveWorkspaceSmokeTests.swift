@@ -247,6 +247,47 @@ final class AdaptiveWorkspaceSmokeTests: XCTestCase {
         XCTAssertFalse(source.contains(".onChange(of: proxy.size.width)"))
     }
 
+    func testInspectorPanePresentationKeepsLayoutSizeConstantWhileCollapsed() {
+        let layout = AdaptiveWorkspaceLayout(mode: .regular)
+
+        XCTAssertEqual(InspectorPanePresentation.width(layout: layout), layout.inspectorMinimumWidth)
+        XCTAssertEqual(InspectorPanePresentation.offset(isPresented: true, layout: layout), 0)
+        XCTAssertEqual(
+            InspectorPanePresentation.offset(isPresented: false, layout: layout),
+            layout.inspectorMinimumWidth + 1
+        )
+    }
+
+    func testWorkspaceUsesAStableNonStructuralInspectorHost() throws {
+        let source = try sourceFile(named: "ContentView.swift")
+
+        XCTAssertTrue(source.contains("InspectorPaneHost("))
+        XCTAssertTrue(source.contains("SidebarPaneHost("))
+        XCTAssertTrue(source.contains("ZStack(alignment: .trailing)"))
+        XCTAssertTrue(source.contains(".accessibilityHidden(!isPresented)"))
+        XCTAssertFalse(source.contains(".inspector(isPresented:"))
+        XCTAssertFalse(source.contains("HSplitView"))
+        XCTAssertFalse(source.contains("NavigationSplitView"))
+    }
+
+    func testSidebarPresentationAlsoAvoidsLayoutSizeMutation() {
+        XCTAssertEqual(SidebarPanePresentation.width, 280)
+        XCTAssertEqual(SidebarPanePresentation.offset(isPresented: true), 0)
+        XCTAssertEqual(SidebarPanePresentation.offset(isPresented: false), -281)
+    }
+
+    func testSidebarToolbarControlDoesNotMutateToolbarPreferences() throws {
+        let source = try sourceFile(named: "ContentView.swift")
+
+        XCTAssertTrue(source.contains("Button {\n                isSidebarPresented.toggle()"))
+        XCTAssertTrue(source.contains("Label(\"Toggle Workspace Sidebar\""))
+        XCTAssertFalse(source.contains("Toggle(isOn: $isSidebarPresented)"))
+        XCTAssertFalse(source.contains("systemImage: \"sidebar.leading\""))
+        XCTAssertTrue(source.contains("Button(action: controller.toggleInspector)"))
+        XCTAssertTrue(source.contains("Label(\"Toggle Output Inspector\""))
+        XCTAssertFalse(source.contains("Toggle(isOn: inspectorBinding)"))
+    }
+
     private func sourceFile(named name: String) throws -> String {
         let packageRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

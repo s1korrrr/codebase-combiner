@@ -52,6 +52,24 @@ struct AdaptiveWorkspaceLayout: Equatable {
     }
 }
 
+enum InspectorPanePresentation {
+    static func width(layout: AdaptiveWorkspaceLayout) -> Double {
+        layout.mode == .wide ? layout.inspectorIdealWidth : layout.inspectorMinimumWidth
+    }
+
+    static func offset(isPresented: Bool, layout: AdaptiveWorkspaceLayout) -> Double {
+        isPresented ? 0 : width(layout: layout) + 1
+    }
+}
+
+enum SidebarPanePresentation {
+    static let width: Double = 280
+
+    static func offset(isPresented: Bool) -> Double {
+        isPresented ? 0 : -(width + 1)
+    }
+}
+
 enum WorkspaceAccessibility {
     static func selectAllHelp(hasWorkspace: Bool, hasIncludableFiles: Bool) -> String {
         if !hasWorkspace {

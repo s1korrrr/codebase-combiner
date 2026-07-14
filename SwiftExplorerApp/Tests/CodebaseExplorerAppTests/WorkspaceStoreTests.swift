@@ -16,12 +16,13 @@ final class WorkspaceStoreTests: XCTestCase {
         await loader.waitUntilRequested(newURL)
 
         await loader.succeed(newURL, with: .fixture(named: "new"))
-        await newScan.value
+        _ = await newScan.value
         await loader.succeed(oldURL, with: .fixture(named: "old"))
-        await oldScan.value
+        let oldOutcome = await oldScan.value
 
         XCTAssertEqual(store.rootNode?.name, "new")
         XCTAssertEqual(store.rootURL, newURL)
+        XCTAssertEqual(oldOutcome, .stale)
     }
 
     func testStaleFailureCannotReplaceNewerWorkspaceStatus() async {
@@ -36,13 +37,14 @@ final class WorkspaceStoreTests: XCTestCase {
         await loader.waitUntilRequested(newURL)
 
         await loader.succeed(newURL, with: .fileFixture(names: ["new.swift"]))
-        await newScan.value
+        _ = await newScan.value
         await loader.fail(oldURL, with: LoaderError.oldScanFailed)
-        await oldScan.value
+        let oldOutcome = await oldScan.value
 
         XCTAssertEqual(store.rootNode?.name, "workspace")
         XCTAssertEqual(store.status, "Loaded 1 files, 1 selected")
         XCTAssertFalse(store.isScanning)
+        XCTAssertEqual(oldOutcome, .stale)
     }
 
     func testCurrentFailurePublishesErrorAndStopsScanning() async {
@@ -57,18 +59,19 @@ final class WorkspaceStoreTests: XCTestCase {
         XCTAssertTrue(store.isScanning)
 
         await loader.fail(rootURL, with: LoaderError.currentScanFailed)
-        await scan.value
+        let outcome = await scan.value
 
         XCTAssertEqual(store.status, "Current scan failed")
         XCTAssertFalse(store.isScanning)
         XCTAssertNil(store.rootNode)
+        XCTAssertEqual(outcome, .failed)
     }
 
     func testInvalidMaximumFileSizeRejectsScanWithoutReplacingWorkspace() async {
         let result = TreeLoadResult.twoFileFixture
         let store = WorkspaceStore(loader: ImmediateWorkspaceLoader(result: result))
 
-        await store.scan(
+        let outcome = await store.scan(
             rootURL: result.root.url,
             preferences: AppPreferences.Values(maxFileSizeKB: 31)
         )
@@ -77,13 +80,14 @@ final class WorkspaceStoreTests: XCTestCase {
         XCTAssertNil(store.rootURL)
         XCTAssertNil(store.rootNode)
         XCTAssertFalse(store.isScanning)
+        XCTAssertEqual(outcome, .rejectedInvalidMaximumFileSize)
     }
 
     func testFirstAcceptedScanSelectsAllAvailableFilesAndUpdatesTotals() async {
         let result = TreeLoadResult.twoFileFixture
         let store = WorkspaceStore(loader: ImmediateWorkspaceLoader(result: result))
 
-        await store.scan(rootURL: result.root.url, preferences: .init())
+        let outcome = await store.scan(rootURL: result.root.url, preferences: .init())
 
         XCTAssertEqual(store.allFiles.map(\.name), ["a.swift", "b.swift"])
         XCTAssertEqual(store.selectedIDs, Set(store.allFiles.map(\.id)))
@@ -91,6 +95,7 @@ final class WorkspaceStoreTests: XCTestCase {
         XCTAssertEqual(store.selectedBytes, 30)
         XCTAssertEqual(store.selectedTokens, 12)
         XCTAssertEqual(store.status, "Loaded 2 files, 2 selected")
+        XCTAssertEqual(outcome, .accepted(fileCount: 2, selectedCount: 2, skippedCount: 0))
     }
 
     func testAcceptedScanPublishesStructuredSummary() async {
@@ -194,7 +199,7 @@ final class WorkspaceStoreTests: XCTestCase {
         let firstScan = Task { await store.scan(rootURL: rootA, preferences: .init()) }
         await loader.waitUntilRequested(rootA)
         await loader.succeed(rootA, with: acceptedResult)
-        await firstScan.value
+        _ = await firstScan.value
         store.clearSelection()
         let selectedFile = try XCTUnwrap(store.allFiles.first { $0.name == "shared.swift" })
         store.toggle(node: selectedFile, isOn: true)
@@ -204,7 +209,7 @@ final class WorkspaceStoreTests: XCTestCase {
         await loader.waitUntilRequested(rootB)
         XCTAssertEqual(store.rootURL, rootA)
         await loader.fail(rootB, with: LoaderError.currentScanFailed)
-        await failedScan.value
+        _ = await failedScan.value
 
         XCTAssertEqual(store.rootURL, rootA)
         XCTAssertEqual(store.rootNode, acceptedState.rootNode)

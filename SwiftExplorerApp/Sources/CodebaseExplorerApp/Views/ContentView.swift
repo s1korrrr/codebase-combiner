@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @ObservedObject private var controller: AppController
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var isSidebarPresented = true
 
     init(controller: AppController) {
         _controller = ObservedObject(wrappedValue: controller)
@@ -14,25 +14,7 @@ struct ContentView: View {
                 mode: WorkspaceLayoutPolicy.mode(for: Double(proxy.size.width))
             )
 
-            NavigationSplitView(columnVisibility: $columnVisibility) {
-                WorkspaceSidebar(controller: controller)
-                    .navigationSplitViewColumnWidth(min: 220, ideal: 280, max: 420)
-            } detail: {
-                HSplitView {
-                    PreparationWorkspace(controller: controller, layout: layout)
-                        .frame(minWidth: layout.preparationMinimumWidth)
-                        .layoutPriority(1)
-
-                    if controller.isInspectorPresented {
-                        OutputInspector(controller: controller, layout: layout)
-                            .frame(
-                                minWidth: layout.inspectorMinimumWidth,
-                                idealWidth: layout.inspectorIdealWidth,
-                                maxWidth: 620
-                            )
-                    }
-                }
-            }
+            workspace(layout: layout)
         }
         .frame(minWidth: 960, minHeight: 640)
         .toolbar {
@@ -42,6 +24,26 @@ struct ContentView: View {
         }
         .task {
             await controller.start()
+        }
+    }
+
+    private func workspace(layout: AdaptiveWorkspaceLayout) -> some View {
+        ZStack(alignment: .leading) {
+            ZStack(alignment: .trailing) {
+                PreparationWorkspace(controller: controller, layout: layout)
+                    .frame(minWidth: layout.preparationMinimumWidth)
+
+                InspectorPaneHost(
+                    controller: controller,
+                    layout: layout,
+                    isPresented: controller.isInspectorPresented
+                )
+            }
+
+            SidebarPaneHost(
+                controller: controller,
+                isPresented: isSidebarPresented
+            )
         }
     }
 
@@ -85,17 +87,25 @@ struct ContentView: View {
     @ToolbarContentBuilder
     private var visibilityToolbar: some ToolbarContent {
         ToolbarItemGroup {
+            Button {
+                isSidebarPresented.toggle()
+            } label: {
+                Label("Toggle Workspace Sidebar", systemImage: "rectangle.leftthird.inset.filled")
+            }
+            .help("Show or hide the workspace sidebar")
+            .accessibilityHint("Toggles the workspace sidebar without changing its contents")
+
             Toggle(isOn: filtersBinding) {
                 Label("Filters", systemImage: "line.3.horizontal.decrease.circle")
             }
             .help(controller.preferences.values.showFilters ? "Hide filters" : "Show filters")
             .accessibilityHint(controller.preferences.values.showFilters ? "Hides workspace filters" : "Shows workspace filters")
 
-            Toggle(isOn: inspectorBinding) {
-                Label("Output Inspector", systemImage: "sidebar.trailing")
+            Button(action: controller.toggleInspector) {
+                Label("Toggle Output Inspector", systemImage: "rectangle.rightthird.inset.filled")
             }
-            .help(controller.isInspectorPresented ? "Hide the output inspector" : "Show the output inspector")
-            .accessibilityHint(controller.isInspectorPresented ? "Collapses the output inspector" : "Shows the output inspector")
+            .help("Show or hide the output inspector")
+            .accessibilityHint("Toggles the output inspector without changing its contents")
         }
     }
 
@@ -109,15 +119,57 @@ struct ContentView: View {
             }
         )
     }
+}
 
-    private var inspectorBinding: Binding<Bool> {
-        Binding(
-            get: { controller.isInspectorPresented },
-            set: { newValue in
-                if newValue != controller.isInspectorPresented {
-                    controller.toggleInspector()
-                }
-            }
+private struct SidebarPaneHost: View {
+    @ObservedObject var controller: AppController
+    let isPresented: Bool
+
+    var body: some View {
+        HStack(spacing: 0) {
+            WorkspaceSidebar(controller: controller)
+                .frame(width: SidebarPanePresentation.width)
+                .background(Color(nsColor: .windowBackgroundColor))
+
+            Divider()
+        }
+        .frame(width: SidebarPanePresentation.width + 1)
+        .offset(x: SidebarPanePresentation.offset(isPresented: isPresented))
+        .opacity(isPresented ? 1 : 0)
+        .allowsHitTesting(isPresented)
+        .accessibilityHidden(!isPresented)
+        .transaction { transaction in
+            transaction.animation = nil
+        }
+    }
+}
+
+private struct InspectorPaneHost: View {
+    @ObservedObject var controller: AppController
+    let layout: AdaptiveWorkspaceLayout
+    let isPresented: Bool
+
+    private var presentedWidth: Double {
+        InspectorPanePresentation.width(layout: layout)
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Divider()
+
+            OutputInspector(controller: controller, layout: layout)
+                .frame(width: presentedWidth)
+                .background(Color(nsColor: .windowBackgroundColor))
+        }
+        .frame(width: presentedWidth + 1)
+        .offset(
+            x: InspectorPanePresentation.offset(isPresented: isPresented, layout: layout)
         )
+        .opacity(isPresented ? 1 : 0)
+        .allowsHitTesting(isPresented)
+        .accessibilityHidden(!isPresented)
+        .transaction { transaction in
+            transaction.animation = nil
+        }
     }
 }

@@ -3,26 +3,22 @@ import Foundation
 
 @MainActor
 struct AppDependencies {
-    static let e2eDataDirectoryEnvironmentKey = "CODEBASE_COMBINER_E2E_DATA_DIR"
     static let e2eWindowSizeEnvironmentKey = "CODEBASE_COMBINER_E2E_WINDOW_SIZE"
-    static let e2eDefaultsSuiteName = "com.s1korrrr.codebasecombiner.e2e"
+    static let e2eBundleIdentifier = "com.s1korrrr.codebasecombiner.e2ehost"
 
     let defaults: UserDefaults
     let draftBaseDirectory: URL?
     let initialWindowSize: CGSize?
 
-    init(environment: [String: String] = ProcessInfo.processInfo.environment) {
-        if let path = environment[Self.e2eDataDirectoryEnvironmentKey], !path.isEmpty {
-            guard let defaults = UserDefaults(suiteName: Self.e2eDefaultsSuiteName) else {
-                preconditionFailure("Unable to create the isolated E2E defaults suite.")
-            }
-            self.defaults = defaults
-            draftBaseDirectory = URL(fileURLWithPath: path, isDirectory: true)
-        } else {
-            defaults = .standard
-            draftBaseDirectory = nil
-        }
-        initialWindowSize = Self.parseWindowSize(environment[Self.e2eWindowSizeEnvironmentKey])
+    init(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        bundleIdentifier: String? = Bundle.main.bundleIdentifier
+    ) {
+        defaults = .standard
+        draftBaseDirectory = nil
+        initialWindowSize = bundleIdentifier == Self.e2eBundleIdentifier
+            ? Self.parseWindowSize(environment[Self.e2eWindowSizeEnvironmentKey])
+            : nil
     }
 
     private static func parseWindowSize(_ value: String?) -> CGSize? {
