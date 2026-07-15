@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-15T15:15:00+02:00",
+  "verdict": "BLOCKED",
+  "product": {
+    "name": "Codebase Combiner",
+    "platform": "macOS",
+    "bundleIdentifier": "com.s1korrrr.codebasecombiner",
+    "marketingVersion": "0.1.0",
+    "buildNumber": "1",
+    "minimumSystemVersion": "13.0",
+    "architecture": "arm64"
+  },
+  "toolchain": {
+    "xcode": "26.6 (17F113)",
+    "macosSDK": "26.5",
+    "swift": "6.3.3",
+    "host": "macOS 27.0 beta (26A5378j)"
+  },
+  "artifacts": [
+    {
+      "path": "codebase-combiner-0.0.1.vsix",
+      "sha256": "e2978c3045bdd049524ff4b6bb0b3a7fa0fb7981e0d7e2f9daf682f5e405d721",
+      "committed": false
+    },
+    {
+      "path": "dist/app-store/Codebase Combiner.app/Contents/MacOS/CodebaseExplorerApp",
+      "sha256": "a5f13fc57a8efaeac405b6857f027c3ea94085684770a0ad1209c1acbe640076",
+      "signing": "ad-hoc",
+      "committed": false
+    },
+    {
+      "path": "dist/app-store/Codebase Combiner.app/Contents/Info.plist",
+      "sha256": "bf7c98aff09592cae377a28e7c9bbc085088f515f79c75f0740cde7cbf198959",
+      "committed": false
+    },
+    {
+      "path": "Packaging/AppStore/AppStore.entitlements",
+      "sha256": "615345301f7afbcccdfe7b43ba9f9209f311c1af90eacae07874db19449c3f33",
+      "committed": true
+    },
+    {
+      "path": "Packaging/AppStore/PrivacyInfo.xcprivacy",
+      "sha256": "6cdca85ca42a8cc9b6ef73cd245705e4c5a9263d1275370752e8d97ad34d66f1",
+      "committed": true
+    },
+    {
+      "path": "dist/app-store/symbols/0.1.0-1-arm64/manifest.txt",
+      "sha256": "18b3f03c34adeafb1eb0473afe3bb1b8d03708f1fb928d1ae044ccde12cccf4e",
+      "committed": false
+    }
+  ],
+  "securityScan": {
+    "id": "5cfbf753-28e5-427a-90f3-144d1afafbad",
+    "reportableFindings": 0
+  },
+  "blockingGates": [
+    "matching Mac App Store provisioning profile",
+    "signed installer and Apple validation",
+    "accepted-size screenshots",
+    "macOS 13 and stable macOS runtime QA",
+    "accessibility and conclusive leak QA",
+    "App Store Connect owner declarations"
+  ]
+}
