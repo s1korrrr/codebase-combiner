@@ -21,6 +21,8 @@ Packaging/DeveloperID/build_release.sh \
 
 The script requires Hardened Runtime, a secure timestamp, the sandbox entitlements, strict signature verification, a matching dSYM, and an explicit architecture. Version 0.1.0 is deliberately Apple-silicon-only until an Intel build is separately produced and tested.
 
+If `security find-identity` lists the certificate but `codesign` returns `errSecInternalComponent`, the private key is not authorized for the non-interactive signer. Fix its access locally in Keychain Access, or import the certificate into a dedicated ephemeral Keychain and grant the standard `apple-tool:,apple:,codesign:` partitions. Never pass a login-Keychain password through a script, shell history, CI log, or support message.
+
 ## Notarization
 
 Store App Store Connect API-key credentials in the login Keychain without writing them to the repository:

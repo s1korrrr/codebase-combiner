@@ -7,7 +7,7 @@
 - [x] Ad-hoc app and mounted-DMG structural validation green.
 - [x] Exact source-state, artifact-hash, metadata, entitlement, architecture, and dSYM binding implemented.
 - [x] Notarization Accepted/Invalid/malformed/interrupted/resume/final-gate contract tests green.
-- [ ] Clean tracked source commit created for the release implementation.
+- [x] Clean tracked source commit created for the release implementation (`ee53940`).
 - [ ] Developer ID Application signature, Hardened Runtime, Team ID, and timestamp verified on the final candidate.
 - [ ] Apple notarization status is `Accepted` and the log is retained.
 - [ ] Ticket stapling and validation pass.
@@ -16,3 +16,5 @@
 - [ ] Draft GitHub Release assets, SBOM, checksums, provenance, and source tag agree.
 - [ ] Downloaded GitHub asset hash and quarantine/Gatekeeper smoke pass.
 - [ ] Draft release is explicitly approved for publication.
+
+Current local blocker: the Developer ID certificate is discoverable, but private-key authorization fails with `errSecInternalComponent`. The owner must authorize `/usr/bin/codesign` locally or import the release identity into a dedicated Keychain; no password or private key should be sent to an agent or committed. A `codebase-combiner-notary` Keychain profile is also required before Apple submission.
