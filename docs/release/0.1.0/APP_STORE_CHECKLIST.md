@@ -1,5 +1,7 @@
 # App Store Connect Checklist
 
+> Alternate channel only. This is not a gate for the Developer ID/GitHub release described in `DIRECT_DISTRIBUTION_CHECKLIST.md`.
+
 ## Draft metadata
 
 - Name: **Codebase Combiner**

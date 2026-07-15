@@ -4,18 +4,26 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-test:
     runs-on: macos-latest
+    timeout-minutes: 30
     env:
       SWIFTFORMAT_VERSION: 0.61.1
       SWIFTFORMAT_SHA256: b990400779aceb7d7020796eb9ba814d4480543f671d38fc0ff48cb72f04c584
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
           cache: npm
@@ -33,10 +41,15 @@ jobs:
         run: npm test
 
       - name: Audit JS dependencies
-        run: npm audit
+        run: |
+          npm audit --omit=dev
+          npm audit
+          npm audit signatures
 
       - name: Package VS Code extension
-        run: npm run package
+        run: |
+          npm run package
+          script/tests/vsix_inventory_test.sh
 
       - name: Install SwiftFormat
         run: |
@@ -63,8 +76,14 @@ jobs:
       - name: Shell contracts
         run: |
           bash -n Packaging/AppStore/build_app_store_package.sh
+          bash -n Packaging/DeveloperID/build_release.sh
+          bash -n Packaging/DeveloperID/notarize_release.sh
           bash Packaging/AppStore/tests/validate_provisioning_profile_test.sh
           bash script/tests/build_and_run_contract_test.sh
+          bash script/tests/open_source_release_contract_test.sh
+
+      - name: Developer ID release contracts
+        run: Packaging/DeveloperID/tests/run_tests.sh
 
       - name: App Store bundle validation
         run: |

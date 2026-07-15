@@ -1,5 +1,7 @@
 # Draft App Review Notes
 
+> Alternate Mac App Store channel only. The intended primary 0.1.0 channel is a Developer ID-signed and notarized GitHub download.
+
 Codebase Combiner is an offline macOS developer utility. It lets the user choose a local folder, filters readable text files, combines selected content, and copies or exports the result. It has no account, backend, network feature, purchase, subscription, advertisement, tracking, user-generated-content service, or demo credentials.
 
 Reviewer flow:

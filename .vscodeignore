@@ -9,6 +9,10 @@ docs/**
 script/**
 test/**
 node_modules/.bin/**
+node_modules/**/.tap/**
+node_modules/**/.github/**
+node_modules/**/*.map
+node_modules/**/*.d.ts
 assets/icon.jpg
 image.png
 AGENTS.md

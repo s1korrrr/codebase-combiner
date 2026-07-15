@@ -1,0 +1,207 @@
+name: macOS Developer ID Release
+
+on:
+  push:
+    tags:
+      - 'macos-v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-source:
+    if: startsWith(github.ref, 'refs/tags/macos-v')
+    runs-on: macos-15
+    timeout-minutes: 10
+    permissions:
+      checks: read
+      contents: read
+    outputs:
+      commit: ${{ steps.verify.outputs.commit }}
+      version: ${{ steps.verify.outputs.version }}
+    steps:
+      - name: Checkout exact tag
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify signed annotated tag, main ancestry, and required checks
+        id: verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#macos-v}"
+          [[ "$version" =~ ^[0-9]+([.][0-9]+){1,2}$ ]]
+
+          ref_json="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$GITHUB_REF_NAME")"
+          test "$(jq -r '.object.type' <<< "$ref_json")" = tag
+          tag_object="$(jq -r '.object.sha' <<< "$ref_json")"
+          tag_json="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$tag_object")"
+          test "$(jq -r '.verification.verified' <<< "$tag_json")" = true
+
+          commit="$(jq -r '.object.sha' <<< "$tag_json")"
+          test "$commit" = "$GITHUB_SHA"
+          git fetch --no-tags origin main
+          test "$commit" = "$(git rev-parse origin/main)"
+
+          checks="$(gh api "repos/$GITHUB_REPOSITORY/commits/$commit/check-runs?per_page=100")"
+          required_checks=(build-test 'Analyze javascript-typescript' 'Analyze swift')
+          for required_check in "${required_checks[@]}"; do
+            passed="$(jq --arg name "$required_check" \
+              '[.check_runs[] | select(.name == $name and .status == "completed" and .conclusion == "success")] | length' \
+              <<< "$checks")"
+            test "$passed" -ge 1 || {
+              echo "Required successful check is missing: $required_check" >&2
+              exit 1
+            }
+          done
+
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  sign-notarize:
+    needs: verify-source
+    runs-on: macos-15
+    timeout-minutes: 45
+    environment: release
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+    env:
+      SIGNING_IDENTITY: 'Developer ID Application: Rafal Sikora (2NY8A789TN)'
+      NOTARY_PROFILE: codebase-combiner-notary
+    steps:
+      - name: Checkout verified source commit
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ needs.verify-source.outputs.commit }}
+          fetch-depth: 0
+
+      - name: Import Developer ID identity
+        env:
+          DEVELOPER_ID_P12_BASE64: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
+          DEVELOPER_ID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/release.keychain-db"
+          keychain_secret="$(openssl rand -hex 32)"
+          certificate="$RUNNER_TEMP/developer-id.p12"
+          printf '%s' "$DEVELOPER_ID_P12_BASE64" | base64 --decode > "$certificate"
+          security create-keychain -p "$keychain_secret" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_secret" "$keychain"
+          security import "$certificate" -k "$keychain" -P "$DEVELOPER_ID_P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_secret" "$keychain"
+          security list-keychains -d user -s "$keychain"
+          security find-identity -p codesigning -v "$keychain" | grep -F "$SIGNING_IDENTITY"
+          echo "RELEASE_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+
+      - name: Store notary credentials in the ephemeral Keychain
+        env:
+          APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          key="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+          printf '%s' "$APPLE_API_KEY_P8_BASE64" | base64 --decode > "$key"
+          chmod 600 "$key"
+          xcrun notarytool store-credentials "$NOTARY_PROFILE" \
+            --key "$key" \
+            --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER_ID" \
+            --keychain "$RELEASE_KEYCHAIN" \
+            --validate
+          rm -f "$key"
+
+      - name: Build and sign the DMG
+        run: |
+          Packaging/DeveloperID/build_release.sh \
+            --version "${{ needs.verify-source.outputs.version }}" \
+            --signing-identity "$SIGNING_IDENTITY"
+
+      - name: Notarize, staple, and validate
+        run: |
+          version="${{ needs.verify-source.outputs.version }}"
+          Packaging/DeveloperID/notarize_release.sh \
+            --dmg "dist/developer-id/Codebase-Combiner-$version-arm64.dmg" \
+            --keychain-profile "$NOTARY_PROFILE" \
+            --keychain "$RELEASE_KEYCHAIN" \
+            --timeout 30m
+
+      - name: Package matched debug symbols
+        run: |
+          version="${{ needs.verify-source.outputs.version }}"
+          ditto -c -k --sequesterRsrc --keepParent \
+            "dist/developer-id/symbols" \
+            "dist/developer-id/Codebase-Combiner-$version-arm64-symbols.zip"
+
+      - name: Attest release DMG
+        uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
+        with:
+          subject-path: dist/developer-id/Codebase-Combiner-${{ needs.verify-source.outputs.version }}-arm64.dmg
+
+      - name: Transfer verified release assets
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: macos-release-${{ needs.verify-source.outputs.version }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            dist/developer-id/Codebase-Combiner-${{ needs.verify-source.outputs.version }}-arm64.dmg
+            dist/developer-id/Codebase-Combiner-${{ needs.verify-source.outputs.version }}-arm64.cdx.json
+            dist/developer-id/Codebase-Combiner-${{ needs.verify-source.outputs.version }}-arm64-symbols.zip
+            dist/developer-id/SHA256SUMS
+            dist/developer-id/release-manifest.json
+            dist/developer-id/notarization/summary.json
+            dist/developer-id/notarization/*-log.json
+
+      - name: Remove ephemeral signing material
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP"/AuthKey_*.p8 "$RUNNER_TEMP/developer-id.p12"
+          if [[ -n "${RELEASE_KEYCHAIN:-}" ]]; then
+            security delete-keychain "$RELEASE_KEYCHAIN" || true
+          fi
+
+  draft-release:
+    needs: [verify-source, sign-notarize]
+    runs-on: macos-15
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout verified source commit
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ needs.verify-source.outputs.commit }}
+
+      - name: Download verified release assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: macos-release-${{ needs.verify-source.outputs.version }}
+          path: release-assets
+
+      - name: Create draft GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${{ needs.verify-source.outputs.version }}"
+          notes="docs/release/$version/RELEASE_NOTES.md"
+          test -f "$notes"
+          gh release create "$GITHUB_REF_NAME" \
+            --verify-tag \
+            --draft \
+            --title "Codebase Combiner $version for macOS" \
+            --notes-file "$notes" \
+            "release-assets/Codebase-Combiner-$version-arm64.dmg" \
+            "release-assets/SHA256SUMS" \
+            "release-assets/Codebase-Combiner-$version-arm64.cdx.json" \
+            "release-assets/Codebase-Combiner-$version-arm64-symbols.zip" \
+            "release-assets/release-manifest.json" \
+            "release-assets/notarization/summary.json" \
+            "release-assets/notarization/"*-log.json
