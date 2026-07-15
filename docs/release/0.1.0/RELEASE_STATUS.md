@@ -31,6 +31,7 @@
 | Signed installer/archive              | BLOCKED        | packaging script without `--skip-signing` exits 3                    | missing matching provisioning profile                                              | Owner: supply profile, rerun package script                            |
 | App Store validation/upload           | BLOCKED        | no signed `.pkg`; no authorized upload performed                     | [BLOCKERS.md](BLOCKERS.md)                                                         | Owner: validate/upload after signed package                            |
 | Security repository scan              | PASS           | Codex Security standard scan                                         | scan `5cfbf753-28e5-427a-90f3-144d1afafbad`, zero reportable findings              | Release lead                                                           |
+| Security final diff scan              | BLOCKED        | Codex Security diff workspace opened                                 | setup session waiting for required Start scan confirmation                         | Owner: press Start scan in the Codex Security pane                     |
 | Privacy manifest/data map             | PASS (repo)    | plist lint and source/data-flow inspection                           | [PRIVACY_DATA_MAP.md](PRIVACY_DATA_MAP.md)                                         | Owner must attest App Store answers                                    |
 | App Review policy mapping             | BLOCKED        | current Apple guidelines reviewed                                    | legal/business declarations unavailable                                            | Owner: approve declarations                                            |
 | App Store metadata draft              | PASS (draft)   | length/content review                                                | [APP_STORE_CHECKLIST.md](APP_STORE_CHECKLIST.md)                                   | Owner approval required                                                |
@@ -53,10 +54,16 @@ Explicit labels/hints were added for filter, size, privacy, and support controls
 
 See [SECURITY_STATUS.md](SECURITY_STATUS.md), [PRIVACY_DATA_MAP.md](PRIVACY_DATA_MAP.md), and [BLOCKERS.md](BLOCKERS.md). The local artifact is ad-hoc signed and is not a distributable Mac App Store package. No archive was uploaded, no TestFlight build exists, and no App Store Connect state was mutated.
 
-## Changes and commits
+## Changes, pull request, and CI
 
 - `35c920a` — dependency and release CI hardening.
-- Remaining cohesive release commits and the draft PR are recorded after final verification.
+- `f01a55c` — App Store packaging validation.
+- `b1e775f` — bounded processing and privacy surfaces.
+- `81e49ff` — blocked 0.1.0 release dossier.
+- `33aa5ce` — independent-review traversal and recovery fixes.
+- `9c8e20d`, `66f2c3f` — shell-contract CI portability fixes.
+- Draft PR: [#4](https://github.com/s1korrrr/codebase-combiner/pull/4).
+- GitHub Actions: push and pull-request `build-test` jobs passed for `66f2c3f` (2m28s and 2m33s).
 - Main themes: deterministic release CI, signing/profile validation, package path safety, symbols, cancellation/resource bounds, privacy/support surfaces, accessibility semantics, and truthful release documentation.
 
 ## Exact next action required to submit
