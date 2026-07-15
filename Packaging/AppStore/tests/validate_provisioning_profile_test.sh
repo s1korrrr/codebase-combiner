@@ -128,27 +128,27 @@ expect_failure "missing user-selected file access" "user-selected file" run_vali
 
 expect_failure "certificate mismatch" "signing certificate" run_validator "$VALID_PROFILE" "$CERTIFICATE_B"
 
-if ! rg -F 'validate_provisioning_profile.py' "$ROOT_DIR/Packaging/AppStore/build_app_store_package.sh" >/dev/null; then
+if ! grep -F 'validate_provisioning_profile.py' "$ROOT_DIR/Packaging/AppStore/build_app_store_package.sh" >/dev/null; then
   echo "FAIL: packaging script does not invoke the profile validator" >&2
   exit 1
 fi
-if rg -n 'pkgutil --check-signature .*\|\| true' "$ROOT_DIR/Packaging/AppStore/build_app_store_package.sh" >/dev/null; then
+if grep -E 'pkgutil --check-signature .*\|\| true' "$ROOT_DIR/Packaging/AppStore/build_app_store_package.sh" >/dev/null; then
   echo "FAIL: package signature failures must not be swallowed" >&2
   exit 1
 fi
-if ! rg -F 'swift build -c release --arch "$ARCHITECTURE"' "$ROOT_DIR/Packaging/AppStore/build_app_store_package.sh" >/dev/null; then
+if ! grep -F 'swift build -c release --arch "$ARCHITECTURE"' "$ROOT_DIR/Packaging/AppStore/build_app_store_package.sh" >/dev/null; then
   echo "FAIL: packaging must build the declared release architecture deterministically" >&2
   exit 1
 fi
-if ! rg -F 'dwarfdump --uuid' "$ROOT_DIR/Packaging/AppStore/build_app_store_package.sh" >/dev/null; then
+if ! grep -F 'dwarfdump --uuid' "$ROOT_DIR/Packaging/AppStore/build_app_store_package.sh" >/dev/null; then
   echo "FAIL: packaging must preserve and verify matching release symbols" >&2
   exit 1
 fi
-if ! rg -F 'security cms -D -u 9' "$ROOT_DIR/Packaging/AppStore/build_app_store_package.sh" >/dev/null; then
+if ! grep -F 'security cms -D -u 9' "$ROOT_DIR/Packaging/AppStore/build_app_store_package.sh" >/dev/null; then
   echo "FAIL: provisioning profiles must use the protected-object signer trust policy" >&2
   exit 1
 fi
-if ! rg -F 'Installer certificate Team ID' "$ROOT_DIR/Packaging/AppStore/build_app_store_package.sh" >/dev/null; then
+if ! grep -F 'Installer certificate Team ID' "$ROOT_DIR/Packaging/AppStore/build_app_store_package.sh" >/dev/null; then
   echo "FAIL: installer identity must be bound to the app signing Team ID" >&2
   exit 1
 fi
