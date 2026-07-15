@@ -1,8 +1,21 @@
 import Foundation
 import UniformTypeIdentifiers
 
+struct WorkspaceScanLimits: Sendable {
+    static let standard = WorkspaceScanLimits(maxFiles: 10000, maxBytes: 64 * 1024 * 1024, maxDepth: 128)
+
+    let maxFiles: Int
+    let maxBytes: Int
+    let maxDepth: Int
+}
+
 struct TreeLoader {
     private let estimator = TokenEstimator()
+    private let limits: WorkspaceScanLimits
+
+    init(limits: WorkspaceScanLimits = .standard) {
+        self.limits = limits
+    }
 
     func loadTree(
         rootURL: URL,
@@ -27,8 +40,11 @@ struct TreeLoader {
         maxFileSizeKB: Int,
         skipHidden: Bool
     ) throws -> TreeLoadResult {
+        try Task.checkCancellation()
         let standardizedRoot = rootURL.standardizedFileURL
         var summary = ScanSummary()
+        var acceptedFileCount = 0
+        var acceptedByteCount = 0
 
         let rootLinkValues = try standardizedRoot.resourceValues(forKeys: [.isSymbolicLinkKey])
         guard rootLinkValues.isSymbolicLink != true else {
@@ -39,7 +55,12 @@ struct TreeLoader {
             throw NSError(domain: "TreeLoader", code: 0, userInfo: [NSLocalizedDescriptionKey: "Root must be a folder."])
         }
 
-        func walk(_ url: URL, relativeTo root: URL) -> FileNode? {
+        func walk(_ url: URL, relativeTo root: URL, depth: Int = 0) throws -> FileNode? {
+            try Task.checkCancellation()
+            guard depth <= limits.maxDepth else {
+                summary.record(.workspaceLimit)
+                return nil
+            }
             let name = url.lastPathComponent
 
             if skipHidden, name.hasPrefix(".") {
@@ -65,7 +86,7 @@ struct TreeLoader {
                     summary.record(.unreadable)
                     return nil
                 }
-                let children = childrenURLs.compactMap { walk($0, relativeTo: root) }
+                let children = try childrenURLs.compactMap { try walk($0, relativeTo: root, depth: depth + 1) }
                 let tokenSum = children.reduce(0) { $0 + $1.tokenCount }
                 let sizeSum = children.reduce(0) { $0 + $1.sizeBytes }
                 return FileNode(
@@ -99,6 +120,12 @@ struct TreeLoader {
                     summary.record(.oversized)
                     return nil
                 }
+                guard acceptedFileCount < limits.maxFiles,
+                      size <= limits.maxBytes - acceptedByteCount
+                else {
+                    summary.record(.workspaceLimit)
+                    return nil
+                }
 
                 guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else {
                     summary.record(.unreadable)
@@ -114,6 +141,8 @@ struct TreeLoader {
                 }
 
                 let tokens = estimator.estimateTokens(in: text)
+                acceptedFileCount += 1
+                acceptedByteCount += size
 
                 return FileNode(
                     name: name,
@@ -128,7 +157,7 @@ struct TreeLoader {
             }
         }
 
-        guard let node = walk(standardizedRoot, relativeTo: standardizedRoot) else {
+        guard let node = try walk(standardizedRoot, relativeTo: standardizedRoot) else {
             throw NSError(domain: "TreeLoader", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unable to read folder contents."])
         }
         return TreeLoadResult(root: node, summary: summary)

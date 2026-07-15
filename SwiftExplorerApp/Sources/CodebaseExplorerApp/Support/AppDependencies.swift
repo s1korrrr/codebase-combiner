@@ -70,26 +70,23 @@ struct BackgroundOutputBuilder: OutputBuilding {
     }
 
     func build(_ input: OutputBuildInput) async -> BuiltOutput {
-        let onBuild = onBuild
-        return await Task.detached(priority: .userInitiated) {
-            onBuild()
-            let payload = CombinedOutputBuilder().build(
-                promptPrefix: input.promptPrefix,
-                files: input.files,
-                format: input.format
-            )
-            let promptTokens = PromptTokenPolicy.estimate(in: input.promptPrefix)
-            let draft = ClipboardDraft(
-                text: payload,
-                format: input.format,
-                fileCount: input.files.count,
-                tokenCount: promptTokens + input.files.reduce(0) { $0 + $1.tokenCount },
-                byteCount: input.files.reduce(0) { $0 + $1.sizeBytes },
-                rootPath: input.rootPath,
-                generatedAt: Date()
-            )
-            return BuiltOutput(payload: payload, draft: draft)
-        }.value
+        onBuild()
+        let payload = CombinedOutputBuilder().build(
+            promptPrefix: input.promptPrefix,
+            files: input.files,
+            format: input.format
+        )
+        let promptTokens = PromptTokenPolicy.estimate(in: input.promptPrefix)
+        let draft = ClipboardDraft(
+            text: payload,
+            format: input.format,
+            fileCount: input.files.count,
+            tokenCount: promptTokens + input.files.reduce(0) { $0 + $1.tokenCount },
+            byteCount: input.files.reduce(0) { $0 + $1.sizeBytes },
+            rootPath: input.rootPath,
+            generatedAt: Date()
+        )
+        return BuiltOutput(payload: payload, draft: draft)
     }
 }
 
@@ -140,10 +137,17 @@ actor OrderedDraftPersistence {
 }
 
 struct FilePayloadSaver: PayloadSaving {
+    private let writer = SerializedFilePayloadWriter()
+
     func save(_ text: String, to url: URL) async throws {
-        try await Task.detached(priority: .utility) {
-            try text.write(to: url, atomically: true, encoding: .utf8)
-        }.value
+        try await writer.save(text, to: url)
+    }
+}
+
+private actor SerializedFilePayloadWriter {
+    func save(_ text: String, to url: URL) throws {
+        try Task.checkCancellation()
+        try text.write(to: url, atomically: true, encoding: .utf8)
     }
 }
 

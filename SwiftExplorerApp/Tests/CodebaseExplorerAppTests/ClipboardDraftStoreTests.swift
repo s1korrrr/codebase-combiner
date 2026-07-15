@@ -3,6 +3,37 @@ import Foundation
 import XCTest
 
 final class ClipboardDraftStoreTests: XCTestCase {
+    func testLoadRejectsDraftLargerThanRecoveryLimitBeforeDecoding() throws {
+        try withTemporaryDirectory { root in
+            let draftURL = root.appendingPathComponent("LastReadyClipboard.json")
+            try Data(repeating: 0x61, count: 33).write(to: draftURL)
+            let store = ClipboardDraftStore(baseDirectory: root, maximumDraftBytes: 32)
+
+            XCTAssertThrowsError(try store.load()) { error in
+                XCTAssertTrue(error.localizedDescription.contains("recovery size limit"))
+            }
+        }
+    }
+
+    func testSaveRejectsDraftLargerThanRecoveryLimit() throws {
+        try withTemporaryDirectory { root in
+            let store = ClipboardDraftStore(baseDirectory: root, maximumDraftBytes: 32)
+            let draft = ClipboardDraft(
+                text: String(repeating: "x", count: 128),
+                format: .plainText,
+                fileCount: 1,
+                tokenCount: 32,
+                byteCount: 128,
+                rootPath: nil,
+                generatedAt: Date(timeIntervalSince1970: 1_800_000_002)
+            )
+
+            XCTAssertThrowsError(try store.save(draft)) { error in
+                XCTAssertTrue(error.localizedDescription.contains("recovery size limit"))
+            }
+        }
+    }
+
     func testSaveLoadAndClearDraft() throws {
         try withTemporaryDirectory { root in
             let store = ClipboardDraftStore(baseDirectory: root)

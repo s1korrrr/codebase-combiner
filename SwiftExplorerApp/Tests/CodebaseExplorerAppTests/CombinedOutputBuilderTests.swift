@@ -3,6 +3,27 @@ import Foundation
 import XCTest
 
 final class CombinedOutputBuilderTests: XCTestCase {
+    func testCancelledBuildReturnsWithoutProcessingFiles() async {
+        let result = await Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return CombinedOutputBuilder().build(
+                promptPrefix: "Do not retain partial output.",
+                files: [FileNode(
+                    name: "App.swift",
+                    relativePath: "App.swift",
+                    url: URL(fileURLWithPath: "/tmp/App.swift"),
+                    isDirectory: false,
+                    tokenCount: 3,
+                    sizeBytes: 11,
+                    content: "print(\"no\")"
+                )],
+                format: .markdown
+            )
+        }.value
+
+        XCTAssertEqual(result, "")
+    }
+
     func testBuildsMarkdownWithPromptAndLanguageHint() {
         let builder = CombinedOutputBuilder()
         let file = FileNode(

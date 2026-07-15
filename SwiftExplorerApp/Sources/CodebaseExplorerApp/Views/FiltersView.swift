@@ -125,6 +125,8 @@ struct FiltersView: View {
                 .textFieldStyle(.roundedBorder)
                 .onSubmit(onApply)
                 .frame(minWidth: 220)
+                .accessibilityLabel("\(title) extensions")
+                .accessibilityHint("Enter extensions separated by commas or spaces")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -137,6 +139,9 @@ struct FiltersView: View {
             HStack(spacing: 12) {
                 Slider(value: $maxFileSizeKB, in: 32 ... 8192, step: 32)
                     .frame(minWidth: 220)
+                    .accessibilityLabel("Maximum file size")
+                    .accessibilityValue("\(Int(maxFileSizeKB)) kilobytes")
+                    .accessibilityHint("Files larger than this value are skipped")
                 VStack(alignment: .leading, spacing: 2) {
                     Text("\(Int(maxFileSizeKB)) KB")
                         .font(.headline.monospacedDigit())
@@ -146,9 +151,13 @@ struct FiltersView: View {
                 }
                 Stepper(value: $maxFileSizeKB, in: 32 ... 8192, step: 64) { EmptyView() }
                     .labelsHidden()
+                    .accessibilityLabel("Adjust maximum file size")
+                    .accessibilityValue("\(Int(maxFileSizeKB)) kilobytes")
                 TextField("KB", value: $maxFileSizeKB, format: .number)
                     .frame(width: 70)
                     .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Maximum file size in kilobytes")
+                    .accessibilityHint("Enter a value from 32 to 8192")
                 Spacer(minLength: 0)
             }
 
@@ -166,13 +175,12 @@ struct FiltersView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 Text("Skip hidden files")
-                    .lineLimit(1)
                 Spacer(minLength: 10)
                 Toggle("Skip hidden files", isOn: $skipHidden)
                     .labelsHidden()
                     .toggleStyle(.switch)
+                    .accessibilityLabel("Skip hidden files")
             }
-            .frame(height: 24)
 
             Button(action: onApply) {
                 Label("Apply", systemImage: "checkmark")
@@ -233,6 +241,8 @@ private struct FilterEditorSheet: View {
                     .frame(minHeight: 70)
                     .font(.body.monospaced())
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(.secondary.opacity(0.25)))
+                    .accessibilityLabel("Included extensions")
+                    .accessibilityHint("Enter extensions separated by commas or spaces")
             }
 
             VStack(alignment: .leading, spacing: 6) {
@@ -243,6 +253,8 @@ private struct FilterEditorSheet: View {
                     .frame(minHeight: 70)
                     .font(.body.monospaced())
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(.secondary.opacity(0.25)))
+                    .accessibilityLabel("Excluded extensions")
+                    .accessibilityHint("Enter extensions separated by commas or spaces")
             }
 
             HStack {

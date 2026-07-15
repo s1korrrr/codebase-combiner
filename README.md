@@ -23,7 +23,7 @@ This repo ships two deliverables:
 - One native Settings scene for output format, filter visibility, hidden-file handling, extension filters, and validated file-size limits.
 - Typed local telemetry for lifecycle, scan, export, and recovery outcomes; logs contain counts and outcomes, not paths or payloads.
 - A macOS 13 semantic-material baseline with narrowly availability-gated macOS 26 presentation when the compiled SDK and runtime support it.
-- A neutral support link in the app menu and Settings for [Buy Me a Coffee](https://buymeacoffee.com/s1korrrr).
+- Public support and privacy-policy links in the app menu and Settings.
 
 ## Getting started
 
@@ -106,6 +106,11 @@ See `CONTRIBUTING.md`.
 ## Security
 
 See `SECURITY.md`.
+
+## Support and privacy
+
+- [Support](docs/support.md)
+- [Privacy policy](docs/privacy-policy.md)
 
 ## License
 

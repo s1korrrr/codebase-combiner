@@ -11,6 +11,7 @@ const {
   collectFiles,
   isBinaryBuffer,
   renderBlock,
+  safeOutputFileName,
 } = require('../lib/combiner');
 
 describe('combiner helpers', () => {
@@ -67,6 +68,46 @@ describe('combiner helpers', () => {
     expect(relativePaths).to.deep.equal(['app.js', 'notes.txt']);
   });
 
+  it('bounds aggregate file count and bytes', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'combiner-limits-'));
+    await fs.writeFile(path.join(root, 'a.txt'), '1234');
+    await fs.writeFile(path.join(root, 'b.txt'), '5678');
+
+    const result = await collectFiles(
+      root,
+      buildMatchers(['**/*']),
+      [],
+      buildExtensionSet(['txt']),
+      new Set(),
+      512,
+      path.join(root, 'combined.txt'),
+      { maxFiles: 1, maxBytes: 4, maxDepth: 8 }
+    );
+
+    expect(result).to.have.length(1);
+    expect(result.skippedByWorkspaceLimit).to.equal(1);
+  });
+
+  it('bounds traversal depth', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'combiner-depth-'));
+    await fs.mkdir(path.join(root, 'one', 'two'), { recursive: true });
+    await fs.writeFile(path.join(root, 'one', 'two', 'deep.txt'), 'deep');
+
+    const result = await collectFiles(
+      root,
+      buildMatchers(['**/*']),
+      [],
+      buildExtensionSet(['txt']),
+      new Set(),
+      512,
+      path.join(root, 'combined.txt'),
+      { maxFiles: 10, maxBytes: 1024, maxDepth: 1 }
+    );
+
+    expect(result).to.deep.equal([]);
+    expect(result.skippedByWorkspaceLimit).to.equal(1);
+  });
+
   it('detects binary buffers', () => {
     expect(isBinaryBuffer(Buffer.from('plain text'))).to.equal(false);
     expect(isBinaryBuffer(Buffer.from([0x00, 0x61]))).to.equal(true);
@@ -76,5 +117,13 @@ describe('combiner helpers', () => {
     const block = renderBlock({ relativePath: 'src/main.swift', content: 'print("hi")' }, 'md');
     expect(block).to.include('```swift');
     expect(block).to.include('## src/main.swift');
+  });
+
+  it('constrains configured output names to a file in the chosen root', () => {
+    expect(safeOutputFileName('combined_code.txt')).to.equal('combined_code.txt');
+    expect(safeOutputFileName('../../outside.txt')).to.equal('outside.txt');
+    expect(safeOutputFileName('/tmp/outside.txt')).to.equal('outside.txt');
+    expect(safeOutputFileName('')).to.equal('combined_code.txt');
+    expect(safeOutputFileName('.')).to.equal('combined_code.txt');
   });
 });

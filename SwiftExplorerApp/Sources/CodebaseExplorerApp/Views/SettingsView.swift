@@ -12,7 +12,7 @@ struct SettingsView: View {
 
             supportSettings
                 .tabItem {
-                    Label("Support", systemImage: "heart")
+                    Label("Help", systemImage: "questionmark.circle")
                 }
         }
         .frame(width: 560, height: 390)
@@ -38,6 +38,8 @@ struct SettingsView: View {
                     Slider(value: maxFileSizeKB, in: 32 ... 8192, step: 32) {
                         Text("Max file size")
                     }
+                    .accessibilityValue("\(Int(preferences.values.maxFileSizeKB)) kilobytes")
+                    .accessibilityHint("Files larger than this value are skipped")
                     Text("\(Int(preferences.values.maxFileSizeKB)) KB")
                         .font(.body.monospacedDigit())
                         .frame(width: 90, alignment: .trailing)
@@ -51,6 +53,8 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                     TextField("swift,js,ts,tsx,jsx,md,txt,py", text: allowListString)
                         .textFieldStyle(.roundedBorder)
+                        .accessibilityLabel("Included extensions")
+                        .accessibilityHint("Enter extensions separated by commas or spaces")
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
@@ -59,6 +63,8 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                     TextField("png,jpg,jpeg,gif,mp4,zip,bin,lock", text: excludeListString)
                         .textFieldStyle(.roundedBorder)
+                        .accessibilityLabel("Excluded extensions")
+                        .accessibilityHint("Enter extensions separated by commas or spaces")
                 }
             }
         }
@@ -110,47 +116,39 @@ struct SettingsView: View {
     private var supportSettings: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 14) {
-                Image(systemName: "heart.fill")
+                Image(systemName: "questionmark.circle.fill")
                     .font(.system(size: 34, weight: .semibold))
-                    .foregroundStyle(.pink)
+                    .foregroundStyle(Color.accentColor)
                     .frame(width: 48, height: 48)
                     .background(.regularMaterial, in: Circle())
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Support Codebase Combiner")
+                    Text("Help & Privacy")
                         .font(.title3.weight(.semibold))
-                    Text("If this tool saves you time, you can sponsor continued work.")
+                    Text("Get support or review how the app handles local files and recovered output.")
                         .foregroundStyle(.secondary)
                 }
             }
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Support link")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Text(AppLinks.supportURL.absoluteString)
-                    .font(.body.monospaced())
-                    .textSelection(.enabled)
-            }
-
-            HStack {
+            VStack(alignment: .leading, spacing: 12) {
                 Button {
                     AppLinks.openSupportPage()
                 } label: {
-                    Label("Buy Me a Coffee", systemImage: "cup.and.saucer.fill")
+                    Label("Open Support", systemImage: "lifepreserver")
                 }
                 .buttonStyle(.borderedProminent)
 
                 Button {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(AppLinks.supportURL.absoluteString, forType: .string)
+                    AppLinks.openPrivacyPolicy()
                 } label: {
-                    Label("Copy Link", systemImage: "doc.on.doc")
+                    Label("Read Privacy Policy", systemImage: "hand.raised")
                 }
                 .buttonStyle(.bordered)
-
-                Spacer()
             }
+
+            Text("Codebase Combiner works locally. It does not send source files, prompts, or usage data to the developer.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
 
             Spacer()
         }

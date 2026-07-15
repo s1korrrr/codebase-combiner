@@ -3,6 +3,67 @@ import Foundation
 import XCTest
 
 final class TreeLoaderTests: XCTestCase {
+    func testLoadStopsAtAggregateFileAndByteLimits() throws {
+        try withTemporaryDirectory { root in
+            try writeFile(at: root.appendingPathComponent("a.swift"), contents: "1234")
+            try writeFile(at: root.appendingPathComponent("b.swift"), contents: "5678")
+
+            let result = try TreeLoader(limits: .init(maxFiles: 1, maxBytes: 4, maxDepth: 8)).load(
+                rootURL: root,
+                allowList: ["swift"],
+                excludeList: [],
+                maxFileSizeKB: 512,
+                skipHidden: true
+            )
+
+            XCTAssertEqual(result.root.flattened.count(where: { !$0.isDirectory }), 1)
+            XCTAssertEqual(result.summary.count(for: .workspaceLimit), 1)
+        }
+    }
+
+    func testLoadStopsAtMaximumDirectoryDepth() throws {
+        try withTemporaryDirectory { root in
+            let nested = root.appendingPathComponent("one/two", isDirectory: true)
+            try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+            try writeFile(at: nested.appendingPathComponent("deep.swift"), contents: "deep")
+
+            let result = try TreeLoader(limits: .init(maxFiles: 10, maxBytes: 1024, maxDepth: 1)).load(
+                rootURL: root,
+                allowList: ["swift"],
+                excludeList: [],
+                maxFileSizeKB: 512,
+                skipHidden: true
+            )
+
+            XCTAssertTrue(result.root.flattened.filter { !$0.isDirectory }.isEmpty)
+            XCTAssertEqual(result.summary.count(for: .workspaceLimit), 1)
+        }
+    }
+
+    func testLoadStopsWhenCurrentTaskIsCancelled() async throws {
+        try await withTemporaryDirectory { root in
+            try writeFile(at: root.appendingPathComponent("App.swift"), contents: "print(\"no\")")
+
+            let error = await Task {
+                withUnsafeCurrentTask { $0?.cancel() }
+                do {
+                    _ = try TreeLoader().load(
+                        rootURL: root,
+                        allowList: ["swift"],
+                        excludeList: [],
+                        maxFileSizeKB: 512,
+                        skipHidden: true
+                    )
+                    return nil as Error?
+                } catch {
+                    return error
+                }
+            }.value
+
+            XCTAssertTrue(error is CancellationError)
+        }
+    }
+
     func testLoadRejectsSymbolicLinkWorkspaceRootWithoutNamingItsTarget() throws {
         try withTemporaryDirectory { container in
             let target = container.appendingPathComponent("private-target", isDirectory: true)
@@ -165,6 +226,17 @@ private func withTemporaryDirectory(_ body: (URL) throws -> Void) throws {
         try? FileManager.default.removeItem(at: resolvedRoot)
     }
     try body(resolvedRoot)
+}
+
+private func withTemporaryDirectory(_ body: (URL) async throws -> Void) async throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let resolvedRoot = root.resolvingSymlinksInPath()
+    defer {
+        try? FileManager.default.removeItem(at: resolvedRoot)
+    }
+    try await body(resolvedRoot)
 }
 
 private func writeFile(at url: URL, contents: String) throws {

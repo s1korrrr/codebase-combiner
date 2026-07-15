@@ -7,6 +7,7 @@ enum CombinedOutputFormat: String, Codable, Sendable {
 
 struct CombinedOutputBuilder {
     func build(promptPrefix: String, files: [FileNode], format: CombinedOutputFormat) -> String {
+        guard !Task.isCancelled else { return "" }
         var blocks: [String] = []
         let prefix = promptPrefix.trimmingCharacters(in: .whitespacesAndNewlines)
         if !prefix.isEmpty {
@@ -14,6 +15,7 @@ struct CombinedOutputBuilder {
         }
 
         for file in files {
+            guard !Task.isCancelled else { return "" }
             guard let content = file.content else { continue }
             switch format {
             case .markdown:

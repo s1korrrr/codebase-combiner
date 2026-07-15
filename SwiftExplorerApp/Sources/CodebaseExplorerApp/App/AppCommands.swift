@@ -43,9 +43,12 @@ struct AppCommands: Commands {
             )
         }
 
-        CommandMenu("Support") {
-            Button("Buy Me a Coffee") {
+        CommandMenu("Help") {
+            Button("Codebase Combiner Support") {
                 AppLinks.openSupportPage()
+            }
+            Button("Privacy Policy") {
+                AppLinks.openPrivacyPolicy()
             }
         }
     }
