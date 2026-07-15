@@ -123,6 +123,7 @@ open "dist/app-store/Codebase Combiner.app"
 ```
 
 This creates a sandbox-entitled, ad-hoc signed app bundle for local validation only. It is not uploadable to App Store Connect until it is signed with Apple distribution assets.
+The default package is Apple silicon (`arm64`) only and includes a UUID-matched dSYM under `dist/app-store/symbols/`.
 
 The script validates the ad-hoc signature with strict `codesign` verification. Gatekeeper can still reject an ad-hoc artifact because it has no Apple distribution identity or notarization ticket; that is expected and is different from an invalid on-disk signature.
 
@@ -177,13 +178,15 @@ Packaging/AppStore/build_app_store_package.sh \
   --provisioning-profile "/path/to/profile.provisionprofile"
 ```
 
+The signed path validates the profile platform, expiration, Team ID, exact bundle identifier, entitlements, and selected certificate before building. Any mismatch is a hard failure, as is a failed installer-signature check.
+
 The signed package, when produced, is written to:
 
 ```sh
 dist/app-store/CodebaseCombiner-AppStore.pkg
 ```
 
-Only after the signed package, embedded profile, account/app record, metadata, privacy declarations, and review inputs are verified should the owner upload it with Apple Transporter, Xcode, or another current Apple-supported upload path.
+Only after the signed package, embedded profile, account/app record, metadata, privacy declarations, screenshots, and review inputs are verified should the owner upload it with Apple Transporter, Xcode, or another current Apple-supported upload path.
 
 ## Legacy SwiftPM executable copy
 

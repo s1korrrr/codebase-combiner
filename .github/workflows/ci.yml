@@ -63,6 +63,7 @@ jobs:
       - name: Shell contracts
         run: |
           bash -n Packaging/AppStore/build_app_store_package.sh
+          bash Packaging/AppStore/tests/validate_provisioning_profile_test.sh
           bash script/tests/build_and_run_contract_test.sh
 
       - name: App Store bundle validation
