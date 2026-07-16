@@ -8,8 +8,8 @@
 - Subtitle: **Combine code for review**
 - Primary category: **Developer Tools**
 - Secondary category: **Productivity** (owner approval)
-- Support URL: `https://github.com/s1korrrr/codebase_combiner/blob/main/docs/support.md`
-- Privacy URL: `https://github.com/s1korrrr/codebase_combiner/blob/main/docs/privacy-policy.md`
+- Support URL: `https://github.com/s1korrrr/codebase-combiner/blob/main/docs/support.md`
+- Privacy URL: `https://github.com/s1korrrr/codebase-combiner/blob/main/docs/privacy-policy.md`
 - Marketing URL: optional; owner decision
 - Keywords draft: `code,source,combine,developer,markdown,clipboard,review,files`
 - Promotional text draft: `Turn a selected local codebase into one focused, review-ready document—entirely on your Mac.`

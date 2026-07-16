@@ -34,6 +34,8 @@ MANIFEST="$TMP_DIR/release-manifest.json"
 ENTITLEMENTS="$TMP_DIR/entitlements.plist"
 INFO_PLIST="$MOUNTED_APP/Contents/Info.plist"
 LOG="$TMP_DIR/calls.log"
+SOURCE_COMMIT="$(git -C "$ROOT_DIR" rev-parse HEAD)"
+SYMBOLS="$TMP_DIR/Codebase-Combiner-0.1.0-arm64-symbols.zip"
 mkdir -p "$BIN_DIR" "$MOUNTED_APP/Contents/MacOS"
 
 cat > "$ENTITLEMENTS" <<'PLIST'
@@ -110,7 +112,15 @@ cat > "$BIN_DIR/codesign" <<'STUB'
 set -euo pipefail
 printf 'codesign %s\n' "$*" >> "$CALL_LOG"
 if [[ "$*" == *"--verify"* && "${FAIL_GATE:-}" == codesign-verify ]]; then exit 74; fi
-if [[ "$*" == *"-dvvv"* ]]; then
+if [[ "$*" == *"--extract-certificates"* ]]; then
+  while [[ $# -gt 0 ]]; do
+    if [[ "$1" == --extract-certificates ]]; then
+      printf 'public certificate fixture\n' > "$2"0
+      exit 0
+    fi
+    shift
+  done
+elif [[ "$*" == *"-dvvv"* ]]; then
   cat >&2 <<'DETAILS'
 Authority=Developer ID Application: Rafal Sikora (2NY8A789TN)
 TeamIdentifier=2NY8A789TN
@@ -119,6 +129,20 @@ Timestamp=Jul 15, 2026 at 10:00:00 PM
 DETAILS
 elif [[ "$*" == *"--entitlements"* ]]; then
   cat "$TEST_ENTITLEMENTS"
+fi
+STUB
+
+cat > "$BIN_DIR/openssl" <<'STUB'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${FAIL_GATE:-}" == fingerprint ]]; then
+  printf 'SHA256 Fingerprint='
+  printf '0%.0s' {1..64}
+  printf '\n'
+else
+  printf 'SHA256 Fingerprint='
+  printf 'A%.0s' {1..64}
+  printf '\n'
 fi
 STUB
 
@@ -148,7 +172,16 @@ cat > "$BIN_DIR/lipo" <<'STUB'
 set -euo pipefail
 printf 'arm64\n'
 STUB
-chmod +x "$BIN_DIR/xcrun" "$BIN_DIR/spctl" "$BIN_DIR/codesign" "$BIN_DIR/hdiutil" "$BIN_DIR/lipo"
+
+cat > "$BIN_DIR/git" <<'STUB'
+#!/usr/bin/env bash
+set -euo pipefail
+case "$*" in
+  *"rev-parse HEAD"*|*"rev-list -n 1 macos-v0.1.0"*) printf '%s\n' "$TEST_SOURCE_COMMIT" ;;
+  *) exec /usr/bin/git "$@" ;;
+esac
+STUB
+chmod +x "$BIN_DIR/xcrun" "$BIN_DIR/spctl" "$BIN_DIR/codesign" "$BIN_DIR/hdiutil" "$BIN_DIR/lipo" "$BIN_DIR/openssl" "$BIN_DIR/git"
 
 reset_fixture() {
   rm -rf "$TMP_DIR/notarization" "$TMP_DIR/SHA256SUMS"
@@ -156,19 +189,20 @@ reset_fixture() {
   ln -s /Applications "$MOUNT_POINT/Applications"
   printf 'dmg fixture\n' > "$DMG"
   printf '{"bomFormat":"CycloneDX","specVersion":"1.5"}\n' > "$SBOM"
+  printf 'symbols fixture\n' > "$SYMBOLS"
   local app_hash
   local dmg_hash
   local sbom_hash
-  local source_commit
+  local symbols_hash
   app_hash="$(shasum -a 256 "$MOUNTED_EXECUTABLE" | awk '{print $1}')"
   dmg_hash="$(shasum -a 256 "$DMG" | awk '{print $1}')"
   sbom_hash="$(shasum -a 256 "$SBOM" | awk '{print $1}')"
-  source_commit="$(git -C "$ROOT_DIR" rev-parse HEAD)"
-  python3 - "$MANIFEST" "$source_commit" "$app_hash" "$dmg_hash" "$sbom_hash" <<'PY'
+  symbols_hash="$(shasum -a 256 "$SYMBOLS" | awk '{print $1}')"
+  python3 - "$MANIFEST" "$SOURCE_COMMIT" "$app_hash" "$dmg_hash" "$sbom_hash" "$symbols_hash" <<'PY'
 import json
 import sys
 
-path, commit, app_hash, dmg_hash, sbom_hash = sys.argv[1:]
+path, commit, app_hash, dmg_hash, sbom_hash, symbols_hash = sys.argv[1:]
 data = {
     "schemaVersion": 1,
     "product": {
@@ -181,6 +215,7 @@ data = {
         "architecture": "arm64",
     },
     "sourceCommit": commit,
+    "sourceTag": "macos-v0.1.0",
     "sourceState": "clean",
     "signingMode": "Developer ID Application: Rafal Sikora (2NY8A789TN)",
     "signingTeamId": "2NY8A789TN",
@@ -194,9 +229,11 @@ data = {
     "artifacts": {
         "dmg": "Codebase-Combiner-0.1.0-arm64.dmg",
         "sbom": "Codebase-Combiner-0.1.0-arm64.cdx.json",
+        "symbols": "Codebase-Combiner-0.1.0-arm64-symbols.zip",
         "appExecutableSHA256": app_hash,
         "dmgSHA256": dmg_hash,
         "sbomSHA256": sbom_hash,
+        "symbolsSHA256": symbols_hash,
     },
 }
 with open(path, "w", encoding="utf-8") as handle:
@@ -208,6 +245,7 @@ PY
     shasum -a 256 \
       "$(basename "$DMG")" \
       "$(basename "$SBOM")" \
+      "$(basename "$SYMBOLS")" \
       "$(basename "$MANIFEST")" > SHA256SUMS.pre-notarization
   )
   : > "$LOG"
@@ -216,7 +254,9 @@ PY
 run_notary() {
   CALL_LOG="$LOG" \
     TEST_MOUNT_POINT="$MOUNT_POINT" \
-    TEST_ENTITLEMENTS="$ENTITLEMENTS" \
+  TEST_ENTITLEMENTS="$ENTITLEMENTS" \
+    TEST_SOURCE_COMMIT="$SOURCE_COMMIT" \
+    CODEBASE_COMBINER_USE_HDIUTIL=1 \
     PATH="$BIN_DIR:$PATH" \
     "$SCRIPT" --dmg "$DMG" --keychain-profile test-notary --keychain "$TMP_DIR/test.keychain-db" --app-name 'Codebase Combiner' "$@"
 }
@@ -257,8 +297,24 @@ assert data["notarization"] == {
 }
 PY
 (cd "$TMP_DIR" && shasum -a 256 -c SHA256SUMS)
-test "$(wc -l < "$TMP_DIR/SHA256SUMS" | tr -d ' ')" = 1
+test "$(wc -l < "$TMP_DIR/SHA256SUMS" | tr -d ' ')" = 7
 grep -F 'Codebase-Combiner-0.1.0-arm64.dmg' "$TMP_DIR/SHA256SUMS" >/dev/null
+grep -F 'Codebase-Combiner-0.1.0-arm64.cdx.json' "$TMP_DIR/SHA256SUMS" >/dev/null
+grep -F 'Codebase-Combiner-0.1.0-arm64-symbols.zip' "$TMP_DIR/SHA256SUMS" >/dev/null
+grep -F 'release-manifest.json' "$TMP_DIR/SHA256SUMS" >/dev/null
+grep -F 'notarization/summary.json' "$TMP_DIR/SHA256SUMS" >/dev/null
+grep -F 'notarization/submission.json' "$TMP_DIR/SHA256SUMS" >/dev/null
+grep -F 'notarization/submission-123-log.json' "$TMP_DIR/SHA256SUMS" >/dev/null
+
+for protected_asset in "$SBOM" "$SYMBOLS" "$MANIFEST" "$TMP_DIR/notarization/summary.json" "$TMP_DIR/notarization/submission-123-log.json"; do
+  cp "$protected_asset" "$protected_asset.backup"
+  printf 'tampered\n' >> "$protected_asset"
+  if (cd "$TMP_DIR" && shasum -a 256 -c SHA256SUMS >/dev/null 2>&1); then
+    echo "Tampered final release asset unexpectedly passed checksums: $protected_asset" >&2
+    exit 1
+  fi
+  mv "$protected_asset.backup" "$protected_asset"
+done
 
 reset_fixture
 if NOTARYTOOL_STATUS=Invalid run_notary >/dev/null 2>&1; then
@@ -298,7 +354,7 @@ INFO_STATUS='In Progress' WAIT_STATUS=Accepted run_notary --submission-id submis
 grep -F 'notarytool info submission-123' "$LOG" >/dev/null
 grep -F 'notarytool wait submission-123' "$LOG" >/dev/null
 
-for failure_gate in staple stapler-validate spctl-open spctl-execute codesign-verify hdiutil-attach wrong-link; do
+for failure_gate in staple stapler-validate spctl-open spctl-execute codesign-verify fingerprint hdiutil-attach wrong-link; do
   reset_fixture
   if FAIL_GATE="$failure_gate" NOTARYTOOL_STATUS=Accepted run_notary >/dev/null 2>&1; then
     echo "Release gate '$failure_gate' unexpectedly succeeded." >&2

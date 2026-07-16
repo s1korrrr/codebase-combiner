@@ -2,9 +2,11 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "$ROOT_DIR/script/release_path_guard.sh"
 PACKAGE_DIR="$ROOT_DIR/SwiftExplorerApp"
 PACKAGING_DIR="$ROOT_DIR/Packaging/AppStore"
-DIST_DIR="$ROOT_DIR/dist/app-store"
+OUTPUT_NAME="${APPSTORE_OUTPUT_NAME:-app-store}"
+DIST_DIR="$ROOT_DIR/dist/$OUTPUT_NAME"
 APP_NAME="${APPSTORE_APP_NAME:-Codebase Combiner}"
 EXECUTABLE_NAME="${APPSTORE_EXECUTABLE_NAME:-CodebaseExplorerApp}"
 BUNDLE_IDENTIFIER="${APPSTORE_BUNDLE_ID:-com.s1korrrr.codebasecombiner}"
@@ -35,7 +37,7 @@ Options:
 
 Environment overrides:
   APPSTORE_BUNDLE_ID, APPSTORE_MARKETING_VERSION, APPSTORE_BUILD_NUMBER,
-  APPSTORE_ARCHITECTURE,
+  APPSTORE_ARCHITECTURE, APPSTORE_OUTPUT_NAME,
   APPSTORE_SIGNING_IDENTITY, APPSTORE_INSTALLER_IDENTITY,
   APPSTORE_PROVISIONING_PROFILE
 USAGE
@@ -100,6 +102,30 @@ invalid_metadata() {
 [[ "$MINIMUM_SYSTEM_VERSION" =~ ^[0-9]+([.][0-9]+){1,2}$ ]] || invalid_metadata "minimum system version"
 [[ "$ARCHITECTURE" == "arm64" || "$ARCHITECTURE" == "x86_64" ]] || invalid_metadata "architecture"
 [[ "$COPYRIGHT_YEAR" =~ ^[0-9]{4}$ ]] || invalid_metadata "copyright year"
+[[ "$OUTPUT_NAME" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || invalid_metadata "output name"
+
+is_app_store_app_identity() {
+  case "$1" in
+    "Apple Distribution:"*|"Mac App Distribution:"*|"3rd Party Mac Developer Application:"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+is_app_store_installer_identity() {
+  case "$1" in
+    "Mac Installer Distribution:"*|"3rd Party Mac Developer Installer:"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+if [[ -n "$SIGNING_IDENTITY" ]] && ! is_app_store_app_identity "$SIGNING_IDENTITY"; then
+  echo "Signing identity must be a Mac App Store distribution identity." >&2
+  exit 3
+fi
+if [[ -n "$INSTALLER_IDENTITY" ]] && ! is_app_store_installer_identity "$INSTALLER_IDENTITY"; then
+  echo "Installer identity must be a Mac App Store installer distribution identity." >&2
+  exit 3
+fi
 
 APP_PATH="$DIST_DIR/$APP_NAME.app"
 PKG_PATH="$DIST_DIR/${APP_NAME// /}-AppStore.pkg"
@@ -119,12 +145,25 @@ ICON_SOURCE="$ROOT_DIR/assets/icon.jpg"
 TEMP_DIR=""
 EXPECTED_TEAM_ID=""
 SIGNING_ENTITLEMENTS="$ENTITLEMENTS"
+SOURCE_COMMIT="$(git -C "$ROOT_DIR" rev-parse HEAD)"
+SOURCE_STATE="clean"
 
 require_tool() {
   if ! command -v "$1" >/dev/null 2>&1; then
     echo "Missing required tool: $1" >&2
     exit 1
   fi
+}
+
+validate_binary_minimum_system_version() {
+  local binary="$1"
+  local binary_minimum
+  binary_minimum="$(xcrun vtool -show-build "$binary" | awk '$1 == "minos" { print $2; exit }')"
+  [[ -n "$binary_minimum" ]] || { echo "Unable to read the Mach-O deployment target." >&2; exit 1; }
+  [[ "$binary_minimum" == "$MINIMUM_SYSTEM_VERSION" ]] || {
+    echo "Mach-O deployment target '$binary_minimum' does not match declared minimum '$MINIMUM_SYSTEM_VERSION'." >&2
+    exit 1
+  }
 }
 
 escape_sed() {
@@ -264,6 +303,7 @@ validate_bundle() {
     actual_team_identifier="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.developer.team-identifier' "$signed_entitlements")"
 
     grep -F "TeamIdentifier=$EXPECTED_TEAM_ID" "$signature_details" >/dev/null
+    grep -E '^Authority=(Apple Distribution|Mac App Distribution|3rd Party Mac Developer Application):' "$signature_details" >/dev/null
     [[ "$actual_application_identifier" == "$expected_application_identifier" ]]
     [[ "$actual_team_identifier" == "$EXPECTED_TEAM_ID" ]]
     [[ "$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.app-sandbox' "$signed_entitlements")" == "true" ]]
@@ -320,8 +360,17 @@ require_tool productbuild
 require_tool lipo
 require_tool dwarfdump
 require_tool shasum
+require_tool xcrun
+
+if [[ -n "$(git -C "$ROOT_DIR" status --porcelain --untracked-files=all)" ]]; then
+  SOURCE_STATE="dirty"
+fi
 
 if [[ "$SKIP_SIGNING" -eq 0 ]]; then
+  [[ "$SOURCE_STATE" == clean ]] || {
+    echo "Production App Store signing requires a clean Git worktree so the package matches its source commit." >&2
+    exit 3
+  }
   maybe_autodetect_identities
   if [[ -z "$SIGNING_IDENTITY" ]]; then
     echo "Missing app signing identity. Install/pass an Apple Distribution, Mac App Distribution, or 3rd Party Mac Developer Application identity, or use --skip-signing for local validation." >&2
@@ -338,7 +387,9 @@ if [[ "$SKIP_SIGNING" -eq 0 ]]; then
   prepare_distribution_signing
 fi
 
+guard_release_output_path "$ROOT_DIR" "$DIST_DIR"
 mkdir -p "$DIST_DIR"
+guard_release_output_path "$ROOT_DIR" "$DIST_DIR"
 rm -rf "$APP_PATH" "$PKG_PATH" "$SUMMARY_PATH" "$SYMBOLS_DIR"
 
 echo "==> Building SwiftPM release product"
@@ -348,6 +399,7 @@ echo "==> Assembling app bundle: $APP_PATH"
 mkdir -p "$APP_PATH/Contents/MacOS" "$APP_PATH/Contents/Resources"
 cp "$RELEASE_BINARY" "$APP_PATH/Contents/MacOS/$EXECUTABLE_NAME"
 chmod 755 "$APP_PATH/Contents/MacOS/$EXECUTABLE_NAME"
+validate_binary_minimum_system_version "$APP_PATH/Contents/MacOS/$EXECUTABLE_NAME"
 render_info_plist
 make_icon
 cp "$PRIVACY_MANIFEST" "$APP_PATH/Contents/Resources/PrivacyInfo.xcprivacy"
@@ -375,6 +427,7 @@ if [[ "$SKIP_SIGNING" -eq 0 ]]; then
   echo "==> Building signed installer package: $PKG_PATH"
   productbuild --component "$APP_PATH" /Applications --sign "$INSTALLER_IDENTITY" "$PKG_PATH"
   pkgutil --check-signature "$PKG_PATH" > "$DIST_DIR/pkg-signature.txt" 2>&1
+  grep -E '(Mac Installer Distribution|3rd Party Mac Developer Installer):' "$DIST_DIR/pkg-signature.txt" >/dev/null
   PKG_CREATED=1
 fi
 
@@ -387,6 +440,8 @@ Bundle ID: $BUNDLE_IDENTIFIER
 Version: $MARKETING_VERSION
 Build: $BUILD_NUMBER
 Architecture: $ARCHITECTURE
+Source commit: $SOURCE_COMMIT
+Source state: $SOURCE_STATE
 Signing mode: $([[ "$SKIP_SIGNING" -eq 1 ]] && printf 'ad-hoc local validation' || printf '%s' "$SIGNING_IDENTITY")
 Installer identity: ${INSTALLER_IDENTITY:-not set}
 Provisioning profile: ${PROVISIONING_PROFILE:-not embedded}

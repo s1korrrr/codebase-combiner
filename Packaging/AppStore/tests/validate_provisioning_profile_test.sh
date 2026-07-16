@@ -152,6 +152,14 @@ if ! grep -F 'Installer certificate Team ID' "$ROOT_DIR/Packaging/AppStore/build
   echo "FAIL: installer identity must be bound to the app signing Team ID" >&2
   exit 1
 fi
+if ! grep -F 'Production App Store signing requires a clean Git worktree' "$ROOT_DIR/Packaging/AppStore/build_app_store_package.sh" >/dev/null; then
+  echo "FAIL: signed App Store packages must be source-bound" >&2
+  exit 1
+fi
+if ! grep -F 'Source commit:' "$ROOT_DIR/Packaging/AppStore/build_app_store_package.sh" >/dev/null; then
+  echo "FAIL: App Store package summary must record the source commit" >&2
+  exit 1
+fi
 
 expect_invalid_package_input() {
   local label="$1"
@@ -181,5 +189,53 @@ expect_invalid_package_input "traversal executable" APPSTORE_EXECUTABLE_NAME "..
 expect_invalid_package_input "traversal version" APPSTORE_MARKETING_VERSION "../../outside"
 expect_invalid_package_input "invalid build number" APPSTORE_BUILD_NUMBER "1/../../outside"
 expect_invalid_package_input "invalid architecture" APPSTORE_ARCHITECTURE "../../outside"
+
+expect_invalid_identity_class() {
+  local label="$1"
+  local expected="$2"
+  shift 2
+  if output="$("$ROOT_DIR/Packaging/AppStore/build_app_store_package.sh" "$@" 2>&1)"; then
+    echo "FAIL: $label should be rejected" >&2
+    exit 1
+  fi
+  if [[ "$output" != *"$expected"* ]]; then
+    echo "FAIL: $label did not report '$expected'" >&2
+    echo "$output" >&2
+    exit 1
+  fi
+}
+
+expect_invalid_identity_class \
+  "development app identity" \
+  "Mac App Store distribution identity" \
+  --signing-identity "Apple Development: Example (TEAM123456)" \
+  --installer-identity "3rd Party Mac Developer Installer: Example (TEAM123456)" \
+  --provisioning-profile "$VALID_PROFILE"
+expect_invalid_identity_class \
+  "Developer ID app identity" \
+  "Mac App Store distribution identity" \
+  --signing-identity "Developer ID Application: Example (TEAM123456)" \
+  --installer-identity "3rd Party Mac Developer Installer: Example (TEAM123456)" \
+  --provisioning-profile "$VALID_PROFILE"
+expect_invalid_identity_class \
+  "Developer ID installer identity" \
+  "Mac App Store installer distribution identity" \
+  --signing-identity "Apple Distribution: Example (TEAM123456)" \
+  --installer-identity "Developer ID Installer: Example (TEAM123456)" \
+  --provisioning-profile "$VALID_PROFILE"
+
+external_output="$(mktemp -d "${TMPDIR:-/tmp}/codebase-combiner-app-store-external.XXXXXX")"
+output_name="app-store-contract-$$"
+output_link="$ROOT_DIR/dist/$output_name"
+mkdir -p "$ROOT_DIR/dist"
+printf 'preserve-external\n' > "$external_output/sentinel"
+ln -s "$external_output" "$output_link"
+if APPSTORE_OUTPUT_NAME="$output_name" "$ROOT_DIR/Packaging/AppStore/build_app_store_package.sh" --skip-signing >/dev/null 2>&1; then
+  echo "FAIL: symlinked App Store output unexpectedly succeeded" >&2
+  exit 1
+fi
+grep -F 'preserve-external' "$external_output/sentinel" >/dev/null
+rm -f "$output_link"
+rm -rf "$external_output"
 
 echo "provisioning-profile and signed-package contracts passed"

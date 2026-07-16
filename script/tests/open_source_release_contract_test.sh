@@ -32,7 +32,7 @@ grep -E 'balanced-match[[:space:]]*\|[[:space:]]*1[.]0[.]2[[:space:]]*\|[[:space
 grep -F 'macos-v0.1.0' RELEASING.md >/dev/null
 grep -F 'Developer ID Application' RELEASING.md >/dev/null
 grep -F 'clean standard macOS account' RELEASING.md >/dev/null
-grep -F 'never committed' RELEASING.md >/dev/null
+grep -F 'local login-Keychain identity must never be exported for CI' RELEASING.md >/dev/null
 
 grep -F 'permissions:' .github/workflows/ci.yml >/dev/null
 grep -F 'contents: read' .github/workflows/ci.yml >/dev/null
@@ -42,6 +42,9 @@ grep -F 'npm audit signatures' .github/workflows/ci.yml >/dev/null
 grep -F 'Packaging/DeveloperID/tests/run_tests.sh' .github/workflows/ci.yml >/dev/null
 
 grep -F 'environment: release' .github/workflows/release.yml >/dev/null
+grep -F "vars.CI_SIGNING_PROVISIONED == 'true'" .github/workflows/release.yml >/dev/null
+grep -F 'CI_DEVELOPER_ID_CERTIFICATE_SHA256' .github/workflows/release.yml >/dev/null
+grep -F 'LOCAL_DEVELOPER_ID_CERTIFICATE_SHA256' .github/workflows/release.yml >/dev/null
 grep -F 'draft' .github/workflows/release.yml >/dev/null
 grep -F 'Packaging/DeveloperID/notarize_release.sh' .github/workflows/release.yml >/dev/null
 grep -F -- '--keychain "$RELEASE_KEYCHAIN"' .github/workflows/release.yml >/dev/null
@@ -50,6 +53,9 @@ grep -F 'verification.verified' .github/workflows/release.yml >/dev/null
 grep -F 'origin/main' .github/workflows/release.yml >/dev/null
 grep -F 'check-runs' .github/workflows/release.yml >/dev/null
 grep -F 'symbols.zip' .github/workflows/release.yml >/dev/null
+grep -F 'dist/developer-id/notarization/submission.json' .github/workflows/release.yml >/dev/null
+grep -F 'release-assets/notarization/submission.json' .github/workflows/release.yml >/dev/null
+grep -F 'DEVELOPER_ID_SOURCE_TAG' .github/workflows/release.yml >/dev/null
 if grep -F 'pull_request:' .github/workflows/release.yml; then
   echo "Release signing must never run on pull requests." >&2
   exit 1

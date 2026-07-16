@@ -2,6 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+source "$ROOT_DIR/script/release_path_guard.sh"
+source "$ROOT_DIR/script/disk_image_tools.sh"
 PACKAGE_DIR="$ROOT_DIR/SwiftExplorerApp"
 PACKAGING_DIR="$ROOT_DIR/Packaging/DeveloperID"
 OUTPUT_NAME="${DEVELOPER_ID_OUTPUT_NAME:-developer-id}"
@@ -16,6 +18,7 @@ MINIMUM_SYSTEM_VERSION="${DEVELOPER_ID_MINIMUM_SYSTEM_VERSION:-13.0}"
 ARCHITECTURE="${DEVELOPER_ID_ARCHITECTURE:-arm64}"
 COPYRIGHT_YEAR="${DEVELOPER_ID_COPYRIGHT_YEAR:-2026}"
 SIGNING_IDENTITY="${DEVELOPER_ID_SIGNING_IDENTITY:-}"
+SOURCE_TAG="${DEVELOPER_ID_SOURCE_TAG:-${GITHUB_REF_NAME:-}}"
 SKIP_SIGNING=0
 
 usage() {
@@ -111,6 +114,8 @@ FINAL_CHECKSUM_PATH="$DIST_DIR/SHA256SUMS"
 NOTARY_DIR="$DIST_DIR/notarization"
 SYMBOLS_DIR="$DIST_DIR/symbols/$MARKETING_VERSION-$BUILD_NUMBER-$ARCHITECTURE"
 SYMBOL_MANIFEST="$SYMBOLS_DIR/manifest.txt"
+SYMBOLS_ARCHIVE_BASENAME="Codebase-Combiner-$MARKETING_VERSION-$ARCHITECTURE-symbols.zip"
+SYMBOLS_ARCHIVE_PATH="$DIST_DIR/$SYMBOLS_ARCHIVE_BASENAME"
 ENTITLEMENTS="$PACKAGING_DIR/DeveloperID.entitlements"
 INFO_TEMPLATE="$PACKAGING_DIR/Info.plist.in"
 PRIVACY_MANIFEST="$PACKAGING_DIR/PrivacyInfo.xcprivacy"
@@ -124,6 +129,17 @@ SOURCE_STATE="clean"
 
 require_tool() {
   command -v "$1" >/dev/null 2>&1 || { echo "Missing required tool: $1" >&2; exit 1; }
+}
+
+validate_binary_minimum_system_version() {
+  local binary="$1"
+  local binary_minimum
+  binary_minimum="$(xcrun vtool -show-build "$binary" | awk '$1 == "minos" { print $2; exit }')"
+  [[ -n "$binary_minimum" ]] || { echo "Unable to read the Mach-O deployment target." >&2; exit 1; }
+  [[ "$binary_minimum" == "$MINIMUM_SYSTEM_VERSION" ]] || {
+    echo "Mach-O deployment target '$binary_minimum' does not match declared minimum '$MINIMUM_SYSTEM_VERSION'." >&2
+    exit 1
+  }
 }
 
 escape_sed() {
@@ -232,14 +248,15 @@ write_metadata() {
   local app_sha256
   local dmg_sha256
   local sbom_sha256
+  local symbols_sha256
   source_commit="$(git -C "$ROOT_DIR" rev-parse HEAD)"
   source_timestamp="$(git -C "$ROOT_DIR" show -s --format=%cI HEAD)"
 
-  python3 - "$SBOM_PATH" "$APP_NAME" "$MARKETING_VERSION" "$BUNDLE_IDENTIFIER" "$source_commit" "$source_timestamp" <<'PY'
+  python3 - "$SBOM_PATH" "$APP_NAME" "$MARKETING_VERSION" "$BUNDLE_IDENTIFIER" "$source_commit" "$source_timestamp" "$SOURCE_TAG" <<'PY'
 import json
 import sys
 
-path, name, version, bundle_id, commit, timestamp = sys.argv[1:]
+path, name, version, bundle_id, commit, timestamp, source_tag = sys.argv[1:]
 document = {
     "bomFormat": "CycloneDX",
     "specVersion": "1.5",
@@ -253,7 +270,10 @@ document = {
             "version": version,
             "bom-ref": f"pkg:generic/{bundle_id}@{version}",
             "licenses": [{"license": {"id": "MIT"}}],
-            "properties": [{"name": "source.commit", "value": commit}],
+            "properties": [
+                {"name": "source.commit", "value": commit},
+                *([{"name": "source.tag", "value": source_tag}] if source_tag else []),
+            ],
         },
     },
     "components": [],
@@ -266,14 +286,15 @@ PY
   app_sha256="$(shasum -a 256 "$APP_PATH/Contents/MacOS/$EXECUTABLE_NAME" | awk '{print $1}')"
   dmg_sha256="$(shasum -a 256 "$DMG_PATH" | awk '{print $1}')"
   sbom_sha256="$(shasum -a 256 "$SBOM_PATH" | awk '{print $1}')"
+  symbols_sha256="$(shasum -a 256 "$SYMBOLS_ARCHIVE_PATH" | awk '{print $1}')"
 
-  python3 - "$MANIFEST_PATH" "$APP_NAME" "$EXECUTABLE_NAME" "$MARKETING_VERSION" "$BUILD_NUMBER" "$BUNDLE_IDENTIFIER" "$MINIMUM_SYSTEM_VERSION" "$ARCHITECTURE" "$signing_mode" "$EXPECTED_TEAM_ID" "$CERTIFICATE_FINGERPRINT_SHA256" "$source_commit" "$SOURCE_STATE" "$DMG_BASENAME" "$SBOM_BASENAME" "$app_sha256" "$dmg_sha256" "$sbom_sha256" <<'PY'
+  python3 - "$MANIFEST_PATH" "$APP_NAME" "$EXECUTABLE_NAME" "$MARKETING_VERSION" "$BUILD_NUMBER" "$BUNDLE_IDENTIFIER" "$MINIMUM_SYSTEM_VERSION" "$ARCHITECTURE" "$signing_mode" "$EXPECTED_TEAM_ID" "$CERTIFICATE_FINGERPRINT_SHA256" "$source_commit" "$SOURCE_TAG" "$SOURCE_STATE" "$DMG_BASENAME" "$SBOM_BASENAME" "$SYMBOLS_ARCHIVE_BASENAME" "$app_sha256" "$dmg_sha256" "$sbom_sha256" "$symbols_sha256" <<'PY'
 import json
 import sys
 
 (path, name, executable, version, build, bundle_id, minimum_os, architecture,
- signing_mode, team_id, certificate_fingerprint, commit, source_state, dmg, sbom,
- app_sha256, dmg_sha256, sbom_sha256) = sys.argv[1:]
+ signing_mode, team_id, certificate_fingerprint, commit, source_tag, source_state,
+ dmg, sbom, symbols, app_sha256, dmg_sha256, sbom_sha256, symbols_sha256) = sys.argv[1:]
 document = {
     "schemaVersion": 1,
     "product": {
@@ -286,6 +307,7 @@ document = {
         "architecture": architecture,
     },
     "sourceCommit": commit,
+    "sourceTag": source_tag or None,
     "sourceState": source_state,
     "signingMode": signing_mode,
     "signingTeamId": team_id or None,
@@ -299,9 +321,11 @@ document = {
     "artifacts": {
         "dmg": dmg,
         "sbom": sbom,
+        "symbols": symbols,
         "appExecutableSHA256": app_sha256,
         "dmgSHA256": dmg_sha256,
         "sbomSHA256": sbom_sha256,
+        "symbolsSHA256": symbols_sha256,
     },
 }
 with open(path, "w", encoding="utf-8") as handle:
@@ -314,7 +338,9 @@ cleanup() {
   rm -rf "$ICONSET_DIR" "$STAGING_DIR" "$OPERATION_LOCK"
 }
 
+guard_release_output_path "$ROOT_DIR" "$DIST_DIR"
 mkdir -p "$DIST_DIR"
+guard_release_output_path "$ROOT_DIR" "$DIST_DIR"
 if ! mkdir "$OPERATION_LOCK" 2>/dev/null; then
   echo "Another Developer ID build is already running for $DIST_DIR." >&2
   exit 7
@@ -322,9 +348,10 @@ fi
 printf '%s\n' "$$" > "$OPERATION_LOCK/pid"
 trap cleanup EXIT
 
-for tool in swift sips iconutil codesign plutil hdiutil lipo dwarfdump shasum python3; do
+for tool in swift sips iconutil codesign plutil lipo dwarfdump shasum python3 xcrun ditto; do
   require_tool "$tool"
 done
+require_disk_image_tool
 
 if [[ -n "$(git -C "$ROOT_DIR" status --porcelain --untracked-files=all)" ]]; then
   SOURCE_STATE="dirty"
@@ -335,12 +362,15 @@ if [[ "$SKIP_SIGNING" -eq 0 ]]; then
   require_tool openssl
   [[ "$SOURCE_STATE" == clean ]] || { echo "Production signing requires a clean Git worktree so the manifest matches the public source commit." >&2; exit 3; }
   [[ -n "$SIGNING_IDENTITY" ]] || { echo "Pass --signing-identity explicitly for production signing." >&2; exit 3; }
+  [[ "$SOURCE_TAG" =~ ^macos-v[0-9]+([.][0-9]+){1,2}$ ]] || { echo "Production signing requires DEVELOPER_ID_SOURCE_TAG=macos-v<version>." >&2; exit 3; }
+  source_tag_commit="$(git -C "$ROOT_DIR" rev-list -n 1 "$SOURCE_TAG" 2>/dev/null || true)"
+  [[ -n "$source_tag_commit" && "$source_tag_commit" == "$(git -C "$ROOT_DIR" rev-parse HEAD)" ]] || { echo "Release tag does not resolve to the source commit." >&2; exit 3; }
   [[ "$SIGNING_IDENTITY" == "Developer ID Application:"* ]] || { echo "Signing identity must be a Developer ID Application identity." >&2; exit 3; }
   identity_exists "$SIGNING_IDENTITY" || { echo "Signing identity not found in keychain: $SIGNING_IDENTITY" >&2; exit 3; }
   read_team_id
 fi
 
-rm -rf "$APP_PATH" "$DMG_PATH" "$SBOM_PATH" "$MANIFEST_PATH" "$CHECKSUM_PATH" "$FINAL_CHECKSUM_PATH" "$NOTARY_DIR" "$SYMBOLS_DIR" "$STAGING_DIR" "$ICONSET_DIR"
+rm -rf "$APP_PATH" "$DMG_PATH" "$SBOM_PATH" "$MANIFEST_PATH" "$CHECKSUM_PATH" "$FINAL_CHECKSUM_PATH" "$NOTARY_DIR" "$SYMBOLS_DIR" "$SYMBOLS_ARCHIVE_PATH" "$STAGING_DIR" "$ICONSET_DIR"
 
 echo "==> Building SwiftPM release product for $ARCHITECTURE"
 swift build -c release --arch "$ARCHITECTURE" --package-path "$PACKAGE_DIR" --product "$EXECUTABLE_NAME"
@@ -352,6 +382,7 @@ echo "==> Assembling $APP_PATH"
 mkdir -p "$APP_PATH/Contents/MacOS" "$APP_PATH/Contents/Resources"
 cp "$RELEASE_BINARY" "$APP_PATH/Contents/MacOS/$EXECUTABLE_NAME"
 chmod 755 "$APP_PATH/Contents/MacOS/$EXECUTABLE_NAME"
+validate_binary_minimum_system_version "$APP_PATH/Contents/MacOS/$EXECUTABLE_NAME"
 render_info_plist
 make_icon
 cp "$PRIVACY_MANIFEST" "$APP_PATH/Contents/Resources/PrivacyInfo.xcprivacy"
@@ -373,12 +404,13 @@ fi
 
 validate_app
 preserve_symbols "$RELEASE_DIR"
+ditto -c -k --sequesterRsrc --keepParent "$DIST_DIR/symbols" "$SYMBOLS_ARCHIVE_PATH"
 
 echo "==> Creating drag-to-Applications DMG"
 mkdir -p "$STAGING_DIR"
 cp -R "$APP_PATH" "$STAGING_DIR/$APP_NAME.app"
 ln -s /Applications "$STAGING_DIR/Applications"
-hdiutil create -volname "$APP_NAME" -srcfolder "$STAGING_DIR" -ov -format UDZO "$DMG_PATH" >/dev/null
+disk_image_create "$APP_NAME" "$STAGING_DIR" "$DMG_PATH"
 
 if [[ "$SKIP_SIGNING" -eq 1 ]]; then
   codesign --force --sign - --timestamp=none "$DMG_PATH"
@@ -396,6 +428,7 @@ write_metadata "$SIGNING_MODE"
     "$APP_NAME.app/Contents/MacOS/$EXECUTABLE_NAME" \
     "symbols/$MARKETING_VERSION-$BUILD_NUMBER-$ARCHITECTURE/$EXECUTABLE_NAME.dSYM/Contents/Resources/DWARF/$EXECUTABLE_NAME" \
     "$SBOM_BASENAME" \
+    "$SYMBOLS_ARCHIVE_BASENAME" \
     "release-manifest.json" > "$(basename "$CHECKSUM_PATH")"
 )
 

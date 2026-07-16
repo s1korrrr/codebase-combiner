@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+source "$ROOT_DIR/script/disk_image_tools.sh"
 SCRIPT="$ROOT_DIR/Packaging/DeveloperID/build_release.sh"
 VERIFIER="$ROOT_DIR/Packaging/DeveloperID/verify_release_artifact.sh"
 OUTPUT_NAME="developer-id-contract-$$"
@@ -12,7 +13,7 @@ mount_point=""
 
 cleanup() {
   if [[ -n "$mount_point" ]]; then
-    hdiutil detach "$mount_point" >/dev/null 2>&1 || true
+    disk_image_eject "$mount_point" >/dev/null 2>&1 || true
   fi
   rm -rf "$DIST_DIR"
 }
@@ -50,10 +51,25 @@ grep -F -- '--timestamp' "$SCRIPT" >/dev/null
 grep -F 'Production signing requires a clean Git worktree' "$SCRIPT" >/dev/null
 grep -F 'Pass --signing-identity explicitly' "$SCRIPT" >/dev/null
 grep -F 'Another Developer ID build is already running' "$SCRIPT" >/dev/null
+grep -F 'guard_release_output_path' "$SCRIPT" >/dev/null
 if grep -E 'codesign .*--deep.*--sign|codesign .*--sign.*--deep' "$SCRIPT"; then
   echo "Developer ID signing must enumerate nested code rather than sign with --deep." >&2
   exit 1
 fi
+
+external_output="$(mktemp -d "${TMPDIR:-/tmp}/codebase-combiner-external-output.XXXXXX")"
+symlink_output_name="$OUTPUT_NAME-symlink"
+symlink_output="$ROOT_DIR/dist/$symlink_output_name"
+mkdir -p "$ROOT_DIR/dist"
+printf 'preserve-external\n' > "$external_output/sentinel"
+ln -s "$external_output" "$symlink_output"
+if DEVELOPER_ID_OUTPUT_NAME="$symlink_output_name" "$SCRIPT" --skip-signing >/dev/null 2>&1; then
+  echo "Symlinked Developer ID output unexpectedly succeeded." >&2
+  exit 1
+fi
+grep -F 'preserve-external' "$external_output/sentinel" >/dev/null
+rm -f "$symlink_output"
+rm -rf "$external_output"
 
 mkdir -p "$DIST_DIR"
 sentinel="$DIST_DIR/path-validation-sentinel"
@@ -84,6 +100,12 @@ if run_build --skip-signing >/dev/null 2>&1; then
 fi
 grep -F 'preserve' "$sentinel" >/dev/null
 rm -rf "$DIST_DIR/.release-operation.lock"
+
+if DEVELOPER_ID_MINIMUM_SYSTEM_VERSION=12.0 run_build --skip-signing >/dev/null 2>&1; then
+  echo "Mismatched Mach-O deployment target unexpectedly succeeded." >&2
+  exit 1
+fi
+grep -F 'preserve' "$sentinel" >/dev/null
 
 mkdir -p "$DIST_DIR/notarization"
 printf 'stale\n' > "$DIST_DIR/notarization/summary.json"
@@ -125,7 +147,7 @@ grep -E '"sourceState": "(clean|dirty)"' "$DIST_DIR/release-manifest.json" >/dev
 grep -F '"appExecutableSHA256":' "$DIST_DIR/release-manifest.json" >/dev/null
 grep -F '"dmgSHA256":' "$DIST_DIR/release-manifest.json" >/dev/null
 
-attach_output="$(hdiutil attach -readonly -nobrowse "$DMG")"
+attach_output="$(disk_image_attach "$DMG")"
 mount_point="$(printf '%s\n' "$attach_output" | awk -F '\t' 'END {print $NF}')"
 test "$(readlink "$mount_point/Applications")" = /Applications
 codesign --verify --deep --strict --verbose=2 "$mount_point/Codebase Combiner.app"
@@ -134,7 +156,7 @@ cmp -s "$ROOT_DIR/THIRD_PARTY_NOTICES.md" "$mount_point/Codebase Combiner.app/Co
 source_hash="$(shasum -a 256 "$APP/Contents/MacOS/CodebaseExplorerApp" | awk '{print $1}')"
 mounted_hash="$(shasum -a 256 "$mount_point/Codebase Combiner.app/Contents/MacOS/CodebaseExplorerApp" | awk '{print $1}')"
 test "$source_hash" = "$mounted_hash"
-hdiutil detach "$mount_point" >/dev/null
+disk_image_eject "$mount_point"
 mount_point=""
 
 (cd "$DIST_DIR" && shasum -a 256 -c SHA256SUMS.pre-notarization)

@@ -97,8 +97,10 @@ FINAL_CHECKSUMS="$DIST_DIR/SHA256SUMS"
 MANIFEST_PATH="$DIST_DIR/release-manifest.json"
 OPERATION_LOCK="$DIST_DIR/.release-operation.lock"
 SBOM_PATH="$(find "$DIST_DIR" -maxdepth 1 -type f -name '*.cdx.json' -print | sort | head -n 1)"
+SYMBOLS_PATH="$(find "$DIST_DIR" -maxdepth 1 -type f -name '*-symbols.zip' -print | sort | head -n 1)"
 [[ -f "$MANIFEST_PATH" ]] || { echo "Release manifest not found: $MANIFEST_PATH" >&2; exit 2; }
 [[ -n "$SBOM_PATH" && -f "$SBOM_PATH" ]] || { echo "Release SBOM not found." >&2; exit 2; }
+[[ -n "$SYMBOLS_PATH" && -f "$SYMBOLS_PATH" ]] || { echo "Release symbols archive not found." >&2; exit 2; }
 
 if ! mkdir "$OPERATION_LOCK" 2>/dev/null; then
   echo "Another release operation is already running for $DIST_DIR." >&2
@@ -289,7 +291,15 @@ PY
 
 (
   cd "$DIST_DIR"
-  shasum -a 256 "$(basename "$DMG_PATH")" > "$(basename "$FINAL_CHECKSUMS")"
+  shasum -a 256 \
+    "$(basename "$DMG_PATH")" \
+    "$(basename "$SBOM_PATH")" \
+    "$(basename "$SYMBOLS_PATH")" \
+    "$(basename "$MANIFEST_PATH")" \
+    "notarization/$(basename "$SUMMARY_JSON")" \
+    "notarization/$(basename "$SUBMIT_JSON")" \
+    "notarization/$(basename "$NOTARY_LOG")" > "$(basename "$FINAL_CHECKSUMS")"
+  shasum -a 256 -c "$(basename "$FINAL_CHECKSUMS")" >/dev/null
 )
 
 echo "==> Notarization Accepted, ticket stapled, Gatekeeper passed"
