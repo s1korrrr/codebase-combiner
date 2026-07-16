@@ -23,7 +23,12 @@ describe('combiner helpers', () => {
       "const { buildMatchers } = require('./lib/combiner');",
       "const pattern = `${Array.from({ length: 11 }, () => '**/a').join('/')}/b`;",
       "const candidate = Array(30).fill('a').join('/');",
-      'if (buildMatchers([pattern])[0].match(candidate)) process.exit(2);',
+      'try {',
+      '  buildMatchers([pattern])[0].match(candidate);',
+      '  process.exit(2);',
+      '} catch (error) {',
+      '  if (!/at most two globstar segments/i.test(error.message)) throw error;',
+      '}',
     ].join('\n');
 
     const result = spawnSync(process.execPath, ['-e', script], {
@@ -34,6 +39,16 @@ describe('combiner helpers', () => {
 
     expect(result.error, result.error?.message).to.equal(undefined);
     expect(result.status, result.stderr).to.equal(0);
+  });
+
+  it('rejects patterns with more than two globstar segments', () => {
+    expect(() => buildMatchers(['**/Sources/**/Generated/**/*.swift'])).to.throw(
+      /at most two globstar segments/i
+    );
+    expect(() => buildMatchers(['**/{Sources/**,Tests/**}/{Generated/**,Fixtures/**}'])).to.throw(
+      /at most two globstar segments/i
+    );
+    expect(() => buildMatchers(['**/Sources/**/*.swift'])).not.to.throw();
   });
 
   it('derives allowed extensions from include globs', () => {
