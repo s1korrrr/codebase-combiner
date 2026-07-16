@@ -21,7 +21,9 @@ Packaging/DeveloperID/build_release.sh \
 
 The script requires Hardened Runtime, a secure timestamp, the sandbox entitlements, strict signature verification, a matching dSYM, and an explicit architecture. Version 0.1.0 is deliberately Apple-silicon-only until an Intel build is separately produced and tested.
 
-If `security find-identity` lists the certificate but `codesign` returns `errSecInternalComponent`, the private key is not authorized for the non-interactive signer. Fix its access locally in Keychain Access, or import the certificate into a dedicated ephemeral Keychain and grant the standard `apple-tool:,apple:,codesign:` partitions. Never pass a login-Keychain password through a script, shell history, CI log, or support message.
+The installed identity is local-only and must be used directly through the login Keychain. Never export its private key, create a PKCS#12 copy, import it into a temporary Keychain, or reuse it for CI. If `security find-identity` lists the certificate but `codesign` returns `errSecInternalComponent`, the owner must repair only the local `/usr/bin/codesign` authorization in Keychain Access. Never pass a login-Keychain password through a script, shell history, CI log, or support message.
+
+CI signing is `blocked:external` until the owner deliberately provisions a separate CI signing credential.
 
 ## Notarization
 

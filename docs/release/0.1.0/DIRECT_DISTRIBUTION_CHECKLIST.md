@@ -17,6 +17,8 @@
 - [ ] Downloaded GitHub asset hash and quarantine/Gatekeeper smoke pass.
 - [ ] Draft release is explicitly approved for publication.
 
-Current local blocker: the Developer ID certificate is discoverable, but private-key authorization fails with `errSecInternalComponent`. The owner must authorize `/usr/bin/codesign` locally or import the release identity into a dedicated Keychain; no password or private key should be sent to an agent or committed. A `codebase-combiner-notary` Keychain profile is also required before Apple submission.
+Current local blocker: the Developer ID certificate is discoverable, but direct login-Keychain private-key authorization fails with `errSecInternalComponent`. The owner must repair only the local `/usr/bin/codesign` authorization. Do not export, copy, repackage, or import the private key. The `codebase-combiner-notary` Keychain profile is installed and validated.
+
+Current CI signing status: `blocked:external` until the owner deliberately provisions a separate CI credential. The local Developer ID private key must never be exported for CI.
 
 Current GitHub blockers: the `release` environment and repository rulesets do not exist, `main` is unprotected, private vulnerability reporting is disabled, and Dependabot security updates plus secret scanning/push protection are disabled. Configure these owner-controlled settings before the release tag is created or Apple credentials are added.

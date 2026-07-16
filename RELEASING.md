@@ -38,7 +38,7 @@ The checked v0.1.0 artifact is Apple silicon (`arm64`) only. Do not claim Intel 
 
 ## Developer ID candidate
 
-The release machine must contain the private-key-backed `Developer ID Application` identity. The private key and all related credentials are never committed, copied into release notes, or exposed to pull-request jobs.
+The release machine must contain the private-key-backed `Developer ID Application` identity. This Mac uses the existing identity directly through its login Keychain. Its private key is never exported, copied, repackaged as PKCS#12, imported into a temporary Keychain, copied into release notes, or exposed to pull-request jobs.
 
 ```sh
 Packaging/DeveloperID/build_release.sh \
@@ -83,6 +83,6 @@ After the workflow creates the draft and before publishing it:
 
 ## GitHub publication
 
-The `release` environment holds the CI signing/notarization credentials and requires manual approval. A verified signed annotated `macos-v*` tag at the current `main` commit triggers `.github/workflows/release.yml`, which creates a draft release only. Release notes must exist at `docs/release/<version>/RELEASE_NOTES.md`. Review the notarization log, artifact hashes, SBOM, matched symbols, provenance, source commit, and clean-download evidence before publishing the draft.
+CI signing is `blocked:external` until the owner deliberately provisions a separate CI signing credential in the protected `release` environment; the local login-Keychain identity must never be exported for CI. Once that boundary is satisfied, a verified signed annotated `macos-v*` tag at the current `main` commit triggers `.github/workflows/release.yml`, which creates a draft release only. Release notes must exist at `docs/release/<version>/RELEASE_NOTES.md`. Review the notarization log, artifact hashes, SBOM, matched symbols, provenance, source commit, and clean-download evidence before publishing the draft.
 
 If a release is defective, leave its tag immutable, mark the release as withdrawn, remove the affected binary from the recommended-download path, publish a security notice when appropriate, and issue a new patch version. Never replace an existing tagged artifact silently.
