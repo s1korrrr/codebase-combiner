@@ -39,7 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationSupportsSecureRestorableState(_: NSApplication) -> Bool {
-        false
+        true
     }
 
     func application(_: NSApplication, shouldSaveSecureApplicationState _: NSCoder) -> Bool {

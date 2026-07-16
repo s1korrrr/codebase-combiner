@@ -1,4 +1,6 @@
+import Darwin
 import Foundation
+import SecureFileAccessC
 import UniformTypeIdentifiers
 
 struct WorkspaceScanLimits: Sendable {
@@ -25,9 +27,14 @@ struct WorkspaceScanLimits: Sendable {
 struct TreeLoader {
     private let estimator = TokenEstimator()
     private let limits: WorkspaceScanLimits
+    private let beforeFileOpen: ((URL) -> Void)?
 
-    init(limits: WorkspaceScanLimits = .standard) {
+    init(
+        limits: WorkspaceScanLimits = .standard,
+        beforeFileOpen: ((URL) -> Void)? = nil
+    ) {
         self.limits = limits
+        self.beforeFileOpen = beforeFileOpen
     }
 
     func loadTree(
@@ -55,6 +62,7 @@ struct TreeLoader {
     ) throws -> TreeLoadResult {
         try Task.checkCancellation()
         let standardizedRoot = rootURL.standardizedFileURL
+        let canonicalRoot = standardizedRoot.resolvingSymlinksInPath()
         var summary = ScanSummary()
         var acceptedFileCount = 0
         var acceptedByteCount = 0
@@ -148,15 +156,27 @@ struct TreeLoader {
                     return nil
                 }
 
-                guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize else {
+                beforeFileOpen?(url)
+                let readResult = readRegularFileWithoutFollowingSymlinks(
+                    at: url,
+                    expectedURL: canonicalRoot.appendingPathComponent(relativePath(for: url, root: root)),
+                    maximumBytes: maxFileSizeKB * 1024
+                )
+                let data: Data
+                switch readResult {
+                case let .success(fileData):
+                    data = fileData
+                case .symbolicLink:
+                    summary.record(.symbolicLink)
+                    return nil
+                case .oversized:
+                    summary.record(.oversized)
+                    return nil
+                case .unreadable:
                     summary.record(.unreadable)
                     return nil
                 }
-
-                if size > maxFileSizeKB * 1024 {
-                    summary.record(.oversized)
-                    return nil
-                }
+                let size = data.count
                 guard acceptedFileCount < limits.maxFiles,
                       size <= limits.maxBytes - acceptedByteCount
                 else {
@@ -164,10 +184,6 @@ struct TreeLoader {
                     return nil
                 }
 
-                guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else {
-                    summary.record(.unreadable)
-                    return nil
-                }
                 if isBinary(data: data) {
                     summary.record(.binary)
                     return nil
@@ -201,15 +217,73 @@ struct TreeLoader {
     }
 
     private func relativePath(for url: URL, root: URL) -> String {
-        var path = url.standardizedFileURL.path.replacingOccurrences(of: root.path, with: "")
-        if path.hasPrefix("/") { path.removeFirst() }
-        return path.isEmpty ? url.lastPathComponent : path
+        let rootComponents = root.standardizedFileURL.pathComponents
+        let urlComponents = url.standardizedFileURL.pathComponents
+        guard urlComponents.starts(with: rootComponents) else {
+            return url.lastPathComponent
+        }
+        let relativeComponents = urlComponents.dropFirst(rootComponents.count)
+        return relativeComponents.isEmpty ? url.lastPathComponent : relativeComponents.joined(separator: "/")
     }
 
     private func isBinary(data: Data) -> Bool {
         let sample = data.prefix(1024)
         return sample.contains(0)
     }
+
+    private func readRegularFileWithoutFollowingSymlinks(
+        at url: URL,
+        expectedURL: URL,
+        maximumBytes: Int
+    ) -> SecureFileReadResult {
+        let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+        guard descriptor >= 0 else {
+            return errno == ELOOP ? .symbolicLink : .unreadable
+        }
+        defer { Darwin.close(descriptor) }
+
+        var metadata = stat()
+        guard fstat(descriptor, &metadata) == 0,
+              metadata.st_mode & S_IFMT == S_IFREG,
+              metadata.st_size >= 0
+        else { return .unreadable }
+        var descriptorPath = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        let pathResult = descriptorPath.withUnsafeMutableBufferPointer { buffer in
+            secure_file_descriptor_path(descriptor, buffer.baseAddress, buffer.count)
+        }
+        guard pathResult == 0 else { return .unreadable }
+        let pathBytes = descriptorPath.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+        let openedPath = URL(
+            fileURLWithPath: String(decoding: pathBytes, as: UTF8.self)
+        ).standardizedFileURL.path
+        guard openedPath == expectedURL.standardizedFileURL.path else { return .symbolicLink }
+        guard metadata.st_size <= maximumBytes else { return .oversized }
+
+        var data = Data()
+        data.reserveCapacity(min(Int(metadata.st_size), maximumBytes))
+        var buffer = [UInt8](repeating: 0, count: 65536)
+        while data.count <= maximumBytes {
+            let remaining = maximumBytes - data.count + 1
+            let bytesRead = buffer.withUnsafeMutableBytes { bytes in
+                Darwin.read(descriptor, bytes.baseAddress, min(bytes.count, remaining))
+            }
+            if bytesRead == 0 { return .success(data) }
+            guard bytesRead > 0 else {
+                if errno == EINTR { continue }
+                return .unreadable
+            }
+            data.append(contentsOf: buffer.prefix(bytesRead))
+            if data.count > maximumBytes { return .oversized }
+        }
+        return .oversized
+    }
+}
+
+private enum SecureFileReadResult {
+    case success(Data)
+    case symbolicLink
+    case oversized
+    case unreadable
 }
 
 private enum TreeLoaderError: LocalizedError {

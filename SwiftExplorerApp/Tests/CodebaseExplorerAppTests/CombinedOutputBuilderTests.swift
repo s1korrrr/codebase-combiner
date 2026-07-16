@@ -64,4 +64,22 @@ final class CombinedOutputBuilderTests: XCTestCase {
 
         XCTAssertEqual(text, "// File: notes.txt\nhello\n")
     }
+
+    func testMarkdownUsesABoundedFenceAndSanitizesHeadingNewlines() {
+        let file = FileNode(
+            name: "unsafe.md",
+            relativePath: "docs/unsafe\n# heading.md",
+            url: URL(fileURLWithPath: "/tmp/unsafe.md"),
+            isDirectory: false,
+            tokenCount: 3,
+            sizeBytes: 32,
+            content: "before\n```swift\ninside\n````\nafter"
+        )
+
+        let text = CombinedOutputBuilder().build(promptPrefix: "", files: [file], format: .markdown)
+
+        XCTAssertTrue(text.contains("`````markdown"))
+        XCTAssertTrue(text.contains("\n`````\n"))
+        XCTAssertFalse(text.contains("unsafe\n# heading"))
+    }
 }

@@ -256,6 +256,83 @@ final class TreeLoaderTests: XCTestCase {
             XCTAssertEqual(firstID, secondID)
         }
     }
+
+    func testRelativePathsRemoveTheRootPrefixExactlyOnce() throws {
+        try withTemporaryDirectory { root in
+            let repeatedRoot = String(root.path.dropFirst())
+            let nested = root.appendingPathComponent(repeatedRoot, isDirectory: true)
+            try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+            try writeFile(at: nested.appendingPathComponent("App.swift"), contents: "print(\"ok\")")
+
+            let result = try TreeLoader().load(
+                rootURL: root,
+                allowList: ["swift"],
+                excludeList: [],
+                maxFileSizeKB: 512,
+                skipHidden: true
+            )
+
+            XCTAssertEqual(
+                result.root.flattened.first(where: { !$0.isDirectory })?.relativePath,
+                "\(repeatedRoot)/App.swift"
+            )
+        }
+    }
+
+    func testFileSwapToSymlinkAfterMetadataCheckIsRejectedWithoutReadingTarget() throws {
+        try withTemporaryDirectory { root in
+            let source = root.appendingPathComponent("source.swift")
+            let outside = root.deletingLastPathComponent().appendingPathComponent("outside-\(UUID().uuidString).swift")
+            try writeFile(at: source, contents: "safe source")
+            try writeFile(at: outside, contents: "private outside source")
+            defer { try? FileManager.default.removeItem(at: outside) }
+
+            let loader = TreeLoader(beforeFileOpen: { url in
+                guard url.lastPathComponent == source.lastPathComponent else { return }
+                try? FileManager.default.removeItem(at: url)
+                try? FileManager.default.createSymbolicLink(at: url, withDestinationURL: outside)
+            })
+            let result = try loader.load(
+                rootURL: root,
+                allowList: ["swift"],
+                excludeList: [],
+                maxFileSizeKB: 512,
+                skipHidden: true
+            )
+
+            XCTAssertTrue(result.root.flattened.filter { !$0.isDirectory }.isEmpty)
+            XCTAssertEqual(result.summary.count(for: .symbolicLink), 1)
+            XCTAssertFalse(result.root.flattened.compactMap(\.content).contains("private outside source"))
+        }
+    }
+
+    func testParentDirectorySwapToSymlinkIsRejectedBeforeReadingEscapingFile() throws {
+        try withTemporaryDirectory { root in
+            let sourceDirectory = root.appendingPathComponent("Sources", isDirectory: true)
+            try FileManager.default.createDirectory(at: sourceDirectory, withIntermediateDirectories: true)
+            try writeFile(at: sourceDirectory.appendingPathComponent("App.swift"), contents: "safe source")
+            let outsideDirectory = root.deletingLastPathComponent().appendingPathComponent("outside-dir-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at: outsideDirectory, withIntermediateDirectories: true)
+            try writeFile(at: outsideDirectory.appendingPathComponent("App.swift"), contents: "private outside source")
+            defer { try? FileManager.default.removeItem(at: outsideDirectory) }
+
+            let loader = TreeLoader(beforeFileOpen: { url in
+                guard url.lastPathComponent == "App.swift" else { return }
+                try? FileManager.default.removeItem(at: sourceDirectory)
+                try? FileManager.default.createSymbolicLink(at: sourceDirectory, withDestinationURL: outsideDirectory)
+            })
+            let result = try loader.load(
+                rootURL: root,
+                allowList: ["swift"],
+                excludeList: [],
+                maxFileSizeKB: 512,
+                skipHidden: true
+            )
+
+            XCTAssertTrue(result.root.flattened.filter { !$0.isDirectory }.isEmpty)
+            XCTAssertEqual(result.summary.count(for: .symbolicLink), 1)
+        }
+    }
 }
 
 private func withTemporaryDirectory(_ body: (URL) throws -> Void) throws {

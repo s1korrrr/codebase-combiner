@@ -15,7 +15,13 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "CodebaseExplorerApp",
+            dependencies: ["SecureFileAccessC"],
             path: "Sources/CodebaseExplorerApp"
+        ),
+        .target(
+            name: "SecureFileAccessC",
+            path: "Sources/SecureFileAccessC",
+            publicHeadersPath: "include"
         ),
         .testTarget(
             name: "CodebaseExplorerAppTests",
