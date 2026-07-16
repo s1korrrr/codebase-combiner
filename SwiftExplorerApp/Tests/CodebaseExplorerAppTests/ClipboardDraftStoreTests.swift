@@ -3,6 +3,37 @@ import Foundation
 import XCTest
 
 final class ClipboardDraftStoreTests: XCTestCase {
+    func testLoadRejectsDraftLargerThanRecoveryLimitBeforeDecoding() throws {
+        try withTemporaryDirectory { root in
+            let draftURL = root.appendingPathComponent("LastReadyClipboard.json")
+            try Data(repeating: 0x61, count: 33).write(to: draftURL)
+            let store = ClipboardDraftStore(baseDirectory: root, maximumDraftBytes: 32)
+
+            XCTAssertThrowsError(try store.load()) { error in
+                XCTAssertTrue(error.localizedDescription.contains("recovery size limit"))
+            }
+        }
+    }
+
+    func testSaveRejectsDraftLargerThanRecoveryLimit() throws {
+        try withTemporaryDirectory { root in
+            let store = ClipboardDraftStore(baseDirectory: root, maximumDraftBytes: 32)
+            let draft = ClipboardDraft(
+                text: String(repeating: "x", count: 128),
+                format: .plainText,
+                fileCount: 1,
+                tokenCount: 32,
+                byteCount: 128,
+                rootPath: nil,
+                generatedAt: Date(timeIntervalSince1970: 1_800_000_002)
+            )
+
+            XCTAssertThrowsError(try store.save(draft)) { error in
+                XCTAssertTrue(error.localizedDescription.contains("recovery size limit"))
+            }
+        }
+    }
+
     func testSaveLoadAndClearDraft() throws {
         try withTemporaryDirectory { root in
             let store = ClipboardDraftStore(baseDirectory: root)
@@ -25,7 +56,7 @@ final class ClipboardDraftStoreTests: XCTestCase {
     }
 
     @MainActor
-    func testAsyncPersistenceBoundaryPreservesTheExistingJSONSchema() async throws {
+    func testAsyncPersistenceUsesBoundedBinaryPlistAndLoadsLegacyJSON() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
             .resolvingSymlinksInPath()
@@ -43,13 +74,14 @@ final class ClipboardDraftStoreTests: XCTestCase {
             generatedAt: Date(timeIntervalSince1970: 1_800_000_001)
         )
 
+        let draftURL = root.appendingPathComponent("LastReadyClipboard.json")
+        try JSONEncoder().encode(draft).write(to: draftURL)
+        let legacyDraft = try await persistence.load()
+        XCTAssertEqual(legacyDraft, draft)
+
         try await persistence.save(draft)
-        let data = try Data(contentsOf: root.appendingPathComponent("LastReadyClipboard.json"))
-        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        XCTAssertEqual(
-            Set(json.keys),
-            Set(["text", "format", "fileCount", "tokenCount", "byteCount", "rootPath", "generatedAt"])
-        )
+        let data = try Data(contentsOf: draftURL)
+        XCTAssertEqual(try PropertyListDecoder().decode(ClipboardDraft.self, from: data), draft)
         let loadedDraft = try await persistence.load()
         XCTAssertEqual(loadedDraft, draft)
 

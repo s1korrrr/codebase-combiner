@@ -23,11 +23,17 @@ This repo ships two deliverables:
 - One native Settings scene for output format, filter visibility, hidden-file handling, extension filters, and validated file-size limits.
 - Typed local telemetry for lifecycle, scan, export, and recovery outcomes; logs contain counts and outcomes, not paths or payloads.
 - A macOS 13 semantic-material baseline with narrowly availability-gated macOS 26 presentation when the compiled SDK and runtime support it.
-- A neutral support link in the app menu and Settings for [Buy Me a Coffee](https://buymeacoffee.com/s1korrrr).
+- Public support and privacy-policy links in the app menu and Settings.
 
 ## Getting started
 
 See `INSTALL.md` for full setup and run instructions.
+
+### Download the macOS app
+
+When an official macOS build is available, it will be distributed outside the Mac App Store through [GitHub Releases](https://github.com/s1korrrr/codebase-combiner/releases) as a Developer ID-signed, Apple-notarized DMG. The planned 0.1.0 artifact is Apple-silicon-only and declares macOS 13 or newer; the release checklist records the required macOS 13 runtime proof.
+
+Download the DMG and its `SHA256SUMS` file from the same release, verify the hash, open the DMG, and drag **Codebase Combiner** into `/Applications`. Do not use Gatekeeper-bypass commands; an official artifact must open normally.
 
 Quick start (VS Code extension):
 
@@ -83,13 +89,22 @@ Output options are configurable in VS Code settings under â€œCodebase Combinerâ€
 - Format (SwiftFormat): `cd SwiftExplorerApp && swiftformat .`
 - Format check: `cd SwiftExplorerApp && swiftformat --lint .`
 
-### Mac App Store packaging
+### Developer ID direct distribution
+
+- Local structural validation: `Packaging/DeveloperID/build_release.sh --skip-signing`
+- Developer ID, DMG, and notarization flow: see `Packaging/DeveloperID/README.md`
+- Public release procedure: see `RELEASING.md`
+- Output directory: `dist/developer-id/`
+
+The local `--skip-signing` output is ad-hoc signed and is not a public distributable. Public readiness requires Developer ID signing, Hardened Runtime, a secure timestamp, Apple notarization acceptance, a stapled ticket, Gatekeeper validation, matching checksums/SBOM/source commit, and a clean-download smoke.
+
+### Alternate Mac App Store packaging
 
 - Local bundle validation: `Packaging/AppStore/build_app_store_package.sh --skip-signing`
 - App Store signing/package flow: see `Packaging/AppStore/README.md`
 - Output directory: `dist/app-store/`
 
-The local command produces a sandbox-entitled, ad-hoc signed `.app`. It is suitable for repository/package validation, not App Store Connect upload. Distribution signing, a matching provisioning profile, an installer package, App Store Connect metadata and declarations, and owner-controlled upload/review remain separate gates.
+The App Store lane remains available as a separate alternate channel; it is not used for the direct GitHub download.
 
 The current implementation was built with Xcode 26.6 and the macOS 26.5 SDK. Running it on macOS 27 does not prove or include macOS 27 SDK-only features; those remain blocked until Xcode 27 is installed and the availability boundary is revalidated.
 
@@ -106,6 +121,11 @@ See `CONTRIBUTING.md`.
 ## Security
 
 See `SECURITY.md`.
+
+## Support and privacy
+
+- [Support](docs/support.md)
+- [Privacy policy](docs/privacy-policy.md)
 
 ## License
 

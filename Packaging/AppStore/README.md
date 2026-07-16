@@ -9,6 +9,7 @@ This folder contains the Mac App Store packaging path for the SwiftPM macOS app.
 - Version: `0.1.0`
 - Build: `1`
 - Minimum macOS: `13.0`
+- Architecture: Apple silicon (`arm64`). Intel Macs are not included in this release artifact.
 - Category: `public.app-category.developer-tools`
 - Entitlements: App Sandbox plus user-selected file read/write access.
 - Privacy manifest: declares no tracking, no collected data, and UserDefaults access for app settings.
@@ -25,6 +26,7 @@ Output:
 
 - `dist/app-store/Codebase Combiner.app`
 - `dist/app-store/CodebaseCombiner-AppStore-summary.txt`
+- `dist/app-store/symbols/0.1.0-1-arm64/` with a UUID-checked dSYM and SHA-256 manifest
 
 ## App Store signing
 
@@ -43,6 +45,10 @@ Packaging/AppStore/build_app_store_package.sh \
   --provisioning-profile "/path/to/profile.provisionprofile"
 ```
 
+Before it builds, the signed path decodes and validates the profile's CMS payload, platform, expiration, Team ID, exact bundle identifier, required entitlements, and inclusion of the selected signing certificate. It stops without producing a package if any check fails. The final package signature is also a fail-closed gate.
+
+Override `--architecture` only when intentionally producing and separately testing another architecture. The default and currently verified release is `arm64`.
+
 The script also accepts environment variables:
 
 ```sh
@@ -56,7 +62,7 @@ APPSTORE_PROVISIONING_PROFILE="/path/to/profile.provisionprofile"
 
 ## Upload
 
-After a signed package is created, upload it through Apple Transporter, Xcode Organizer, `xcrun altool`, or the App Store Connect API.
+After a signed package is created and independently validated, upload it through Apple Transporter, Xcode Organizer, or the App Store Connect API.
 
 Before submission, validate sandboxed behavior by launching the packaged app and checking:
 
@@ -70,4 +76,4 @@ Before submission, validate sandboxed behavior by launching the packaged app and
 
 ## Current local blocker
 
-This repository can now create the `.app` bundle locally. Final Mac App Store upload still depends on signing assets that are intentionally not committed to git.
+This repository can create and validate an ad-hoc `.app` bundle locally. Final Mac App Store packaging is blocked until a non-expired provisioning profile matching `com.s1korrrr.codebasecombiner`, the installed distribution certificate, and the required entitlements is available.

@@ -19,8 +19,8 @@
 - Window roles: primary workspace window and standard Settings window.
 - Layout model: adaptive workspace sidebar, preparation surface, and output inspector. The two outer pane hosts stay structurally mounted and use transform/opacity for visibility because changing AppKit-backed split/toolbar structure crashed the audited macOS 27 beta host. Pure pane geometry reserves a non-overlapping preparation region for every visible combination.
 - State ownership: `AppController` coordinates `AppPreferences`, `WorkspaceStore`, `OutputStore`, and shared sidebar/inspector visibility; views retain only local presentation details.
-- Persistence: preferences in UserDefaults; the last ready combined payload remains an atomic JSON draft under Application Support with its existing schema.
-- Services: `TreeLoader`, `TokenEstimator`, shared prompt/preview policies, `CombinedOutputBuilder`, `ClipboardDraftStore`, injected clipboard/save boundaries, and typed metadata-only telemetry. `TreeLoader` rejects symbolic links before target metadata or content access.
+- Persistence: preferences in UserDefaults; the last ready combined payload is an atomic binary property-list draft under Application Support, with bounded legacy JSON read compatibility.
+- Services: `TreeLoader`, `TokenEstimator`, shared prompt/preview policies, `CombinedOutputBuilder`, `ClipboardDraftStore`, injected clipboard/save boundaries, and typed metadata-only telemetry. `TreeLoader` rejects symbolic links and verifies the opened file descriptor's resolved path before reading content.
 - App Intents / Foundation Models / advanced capabilities: not used in v1.
 - Folder/module structure: `App/`, `Models/`, `Stores/`, `Services/`, `Support/`, `Views/`, and focused XCTest targets.
 

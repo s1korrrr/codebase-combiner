@@ -25,7 +25,7 @@ final class AdaptiveWorkspaceSmokeTests: XCTestCase {
     }
 
     func testVisiblePanesNeverOverlapPreparationAtSupportedWidths() {
-        for width in [960.0, 1180.0, 1320.0, 1680.0] {
+        for width in [WindowContentSizePolicy.minimumWidth, 959.0, 960.0, 1180.0, 1320.0, 1680.0] {
             let layout = AdaptiveWorkspaceLayout(mode: WorkspaceLayoutPolicy.mode(for: width))
             for sidebarPresented in [false, true] {
                 for inspectorPresented in [false, true] {
@@ -46,6 +46,20 @@ final class AdaptiveWorkspaceSmokeTests: XCTestCase {
                 }
             }
         }
+    }
+
+    func testMinimumWindowWidthMakesCompactLayoutReachableWithoutOverlappingPanes() {
+        let width = WindowContentSizePolicy.minimumWidth
+        let layout = AdaptiveWorkspaceLayout(mode: WorkspaceLayoutPolicy.mode(for: width))
+        let frames = WorkspacePaneGeometry.frames(
+            totalWidth: width,
+            layout: layout,
+            isSidebarPresented: true,
+            isInspectorPresented: true
+        )
+
+        XCTAssertEqual(layout.mode, .compact)
+        XCTAssertGreaterThanOrEqual(frames.preparation.width, layout.preparationMinimumWidth)
     }
 
     func testAccessibilityCopyNamesSelectionPrerequisitesAndKeepsScanSummaryPrivate() {

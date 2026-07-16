@@ -2,15 +2,16 @@
 
 ## Supported versions
 
-This project does not currently maintain a formal support window. Security fixes will be released as needed.
+Security fixes are provided for the latest published release. Older releases may be unsupported once a fix is available.
 
 ## Reporting a vulnerability
 
-Please do not open public issues for security reports.
+Do not disclose a suspected vulnerability in an issue, discussion, pull request, or other public channel.
 
-Preferred reporting path:
+Use [GitHub private vulnerability reporting](https://github.com/s1korrrr/codebase-combiner/security/advisories/new). Include affected versions, impact, reproduction details, and any suggested mitigation. Please omit secrets, private source code, and unrelated personal data.
 
-- If hosted on GitHub with Security Advisories enabled, submit a private advisory.
-- If that is not available, open a GitHub issue titled “Security Report” with minimal details and request a private follow-up. Maintainers will respond and move the discussion to a private channel.
+The maintainer will acknowledge the report, investigate it, and coordinate remediation and disclosure with the reporter. Timing depends on severity and the complexity of a safe fix.
 
-We aim to acknowledge reports promptly and provide a timeline for remediation.
+## Release security
+
+An artifact is official only when it is attached to a GitHub Release, signed with Apple Developer ID, notarized by Apple, and accompanied by a matching SHA-256 checksum. Signing certificates, notarization credentials, and private keys are never repository contents.

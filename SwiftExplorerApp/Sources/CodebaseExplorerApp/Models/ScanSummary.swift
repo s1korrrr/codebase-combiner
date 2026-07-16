@@ -6,6 +6,7 @@ enum ScanSkipReason: String, CaseIterable, Sendable {
     case binary
     case symbolicLink
     case unreadable
+    case workspaceLimit
 }
 
 struct ScanSummary: Equatable, Sendable {

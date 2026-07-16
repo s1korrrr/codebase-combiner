@@ -3,6 +3,27 @@ import Foundation
 import XCTest
 
 final class CombinedOutputBuilderTests: XCTestCase {
+    func testCancelledBuildReturnsWithoutProcessingFiles() async {
+        let result = await Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return CombinedOutputBuilder().build(
+                promptPrefix: "Do not retain partial output.",
+                files: [FileNode(
+                    name: "App.swift",
+                    relativePath: "App.swift",
+                    url: URL(fileURLWithPath: "/tmp/App.swift"),
+                    isDirectory: false,
+                    tokenCount: 3,
+                    sizeBytes: 11,
+                    content: "print(\"no\")"
+                )],
+                format: .markdown
+            )
+        }.value
+
+        XCTAssertEqual(result, "")
+    }
+
     func testBuildsMarkdownWithPromptAndLanguageHint() {
         let builder = CombinedOutputBuilder()
         let file = FileNode(
@@ -42,5 +63,23 @@ final class CombinedOutputBuilderTests: XCTestCase {
         let text = builder.build(promptPrefix: "   ", files: [file], format: .plainText)
 
         XCTAssertEqual(text, "// File: notes.txt\nhello\n")
+    }
+
+    func testMarkdownUsesABoundedFenceAndSanitizesHeadingNewlines() {
+        let file = FileNode(
+            name: "unsafe.md",
+            relativePath: "docs/unsafe\n# heading.md",
+            url: URL(fileURLWithPath: "/tmp/unsafe.md"),
+            isDirectory: false,
+            tokenCount: 3,
+            sizeBytes: 32,
+            content: "before\n```swift\ninside\n````\nafter"
+        )
+
+        let text = CombinedOutputBuilder().build(promptPrefix: "", files: [file], format: .markdown)
+
+        XCTAssertTrue(text.contains("`````markdown"))
+        XCTAssertTrue(text.contains("\n`````\n"))
+        XCTAssertFalse(text.contains("unsafe\n# heading"))
     }
 }

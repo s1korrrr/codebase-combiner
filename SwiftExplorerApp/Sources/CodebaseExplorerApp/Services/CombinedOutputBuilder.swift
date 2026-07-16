@@ -7,6 +7,7 @@ enum CombinedOutputFormat: String, Codable, Sendable {
 
 struct CombinedOutputBuilder {
     func build(promptPrefix: String, files: [FileNode], format: CombinedOutputFormat) -> String {
+        guard !Task.isCancelled else { return "" }
         var blocks: [String] = []
         let prefix = promptPrefix.trimmingCharacters(in: .whitespacesAndNewlines)
         if !prefix.isEmpty {
@@ -14,12 +15,14 @@ struct CombinedOutputBuilder {
         }
 
         for file in files {
+            guard !Task.isCancelled else { return "" }
             guard let content = file.content else { continue }
             switch format {
             case .markdown:
-                blocks.append("## \(file.relativePath)\n\n```\(languageHint(for: file))\n\(content)\n```\n")
+                let fence = markdownFence(for: content)
+                blocks.append("## \(markdownHeading(for: file.relativePath))\n\n\(fence)\(languageHint(for: file))\n\(content)\n\(fence)\n")
             case .plainText:
-                blocks.append("// File: \(file.relativePath)\n\(content)\n")
+                blocks.append("// File: \(singleLinePath(file.relativePath))\n\(content)\n")
             }
         }
 
@@ -46,5 +49,31 @@ struct CombinedOutputBuilder {
         case "md": "markdown"
         default: ""
         }
+    }
+
+    private func markdownFence(for content: String) -> String {
+        var longestRun = 0
+        var currentRun = 0
+        for character in content {
+            if character == "`" {
+                currentRun += 1
+                longestRun = max(longestRun, currentRun)
+            } else {
+                currentRun = 0
+            }
+        }
+        return String(repeating: "`", count: max(3, longestRun + 1))
+    }
+
+    private func markdownHeading(for path: String) -> String {
+        singleLinePath(path).replacingOccurrences(
+            of: #"([\\`*_\[\]<>#])"#,
+            with: #"\\$1"#,
+            options: .regularExpression
+        )
+    }
+
+    private func singleLinePath(_ path: String) -> String {
+        path.replacingOccurrences(of: #"[\r\n\u{2028}\u{2029}]+"#, with: " ", options: .regularExpression)
     }
 }

@@ -184,13 +184,14 @@ final class AppController: ObservableObject {
 
     func save() {
         guard commandState.canExport,
+              let payload = output.exportPayload,
               let destination = saveDestinationPicker(output.format)
         else { return }
 
         saveTask?.cancel()
         saveTask = Task { [weak self] in
             guard let self else { return }
-            await output.saveCurrent(to: destination)
+            await output.save(payload, to: destination)
         }
     }
 
@@ -259,9 +260,9 @@ final class AppController: ObservableObject {
             .store(in: &cancellables)
 
         output.$status
-            .compactMap(\.self)
             .sink { [weak self] status in
-                self?.displayStatus = status
+                guard let self else { return }
+                displayStatus = status ?? workspace.status
             }
             .store(in: &cancellables)
 

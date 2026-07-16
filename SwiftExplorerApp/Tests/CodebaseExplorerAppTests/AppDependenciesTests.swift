@@ -47,4 +47,8 @@ final class AppDependenciesTests: XCTestCase {
         XCTAssertEqual(frame.size, CGSize(width: 1440, height: 900))
         XCTAssertEqual(frame.origin, CGPoint(x: 36, y: 24.5))
     }
+
+    func testApplicationOptsIntoSecureRestorableStateEvenThoughWindowRestorationIsDisabled() {
+        XCTAssertTrue(AppDelegate().applicationSupportsSecureRestorableState(NSApplication.shared))
+    }
 }

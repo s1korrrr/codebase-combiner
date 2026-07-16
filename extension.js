@@ -7,7 +7,10 @@ const {
   buildExtensionSet,
   collectFiles,
   renderBlock,
+  safeOutputFileName,
   stripDot,
+  atomicWriteFile,
+  normalizeMaxFileSizeKB,
 } = require('./lib/combiner');
 
 function activate(context) {
@@ -38,12 +41,12 @@ async function handleCombineWorkspace() {
     return;
   }
 
-  const outputFileName = await promptForOutputFileName(config.outputFileName);
-  if (!outputFileName) {
+  const outputPath = await promptForOutputPath(folder.uri.fsPath, config.outputFileName);
+  if (!outputPath) {
     return;
   }
 
-  await combineRoot(folder.uri.fsPath, outputFileName, { ...config, ...filters });
+  await combineRoot(folder.uri.fsPath, outputPath, { ...config, ...filters });
 }
 
 async function handleCombineFolder(uri) {
@@ -71,29 +74,36 @@ async function handleCombineFolder(uri) {
     return;
   }
 
-  const outputFileName = await promptForOutputFileName(config.outputFileName);
-  if (!outputFileName) {
+  const outputPath = await promptForOutputPath(targetPath, config.outputFileName);
+  if (!outputPath) {
     return;
   }
 
-  await combineRoot(targetPath, outputFileName, { ...config, ...filters });
+  await combineRoot(targetPath, outputPath, { ...config, ...filters });
 }
 
-async function combineRoot(rootPath, outputFileName, config) {
-  const includeMatchers = buildMatchers(config.includeGlobs);
-  const excludeMatchers = buildMatchers(config.excludeGlobs);
-  const includeExtensions = buildExtensionSet(config.includeExtensions);
-  const excludeExtensions = buildExtensionSet(config.excludeExtensions);
+async function combineRoot(rootPath, outputAbsolute, config) {
+  let includeMatchers;
+  let excludeMatchers;
+  let includeExtensions;
+  let excludeExtensions;
+  let maxFileSizeKB;
+  try {
+    includeMatchers = buildMatchers(config.includeGlobs);
+    excludeMatchers = buildMatchers(config.excludeGlobs);
+    includeExtensions = buildExtensionSet(config.includeExtensions);
+    excludeExtensions = buildExtensionSet(config.excludeExtensions);
+    maxFileSizeKB = normalizeMaxFileSizeKB(config.maxFileSizeKB);
+  } catch (err) {
+    vscode.window.showErrorMessage(`Codebase Combiner: invalid filters: ${err.message}`);
+    return;
+  }
 
   const allowedExtensions = includeExtensions.size
     ? includeExtensions
     : config.useExtensionsFilter
       ? deriveAllowedExtensions(config.includeGlobs)
       : new Set();
-
-  const outputAbsolute = path.isAbsolute(outputFileName)
-    ? outputFileName
-    : path.join(rootPath, outputFileName);
 
   try {
     await fs.promises.mkdir(path.dirname(outputAbsolute), { recursive: true });
@@ -109,33 +119,58 @@ async function combineRoot(rootPath, outputFileName, config) {
       {
         location: vscode.ProgressLocation.Notification,
         title: 'Codebase Combiner: combining files…',
-        cancellable: false,
+        cancellable: true,
       },
-      async () => {
-        const files = await collectFiles(
-          rootPath,
-          includeMatchers,
-          excludeMatchers,
-          allowedExtensions,
-          excludeExtensions,
-          config.maxFileSizeKB,
-          outputAbsolute
-        );
+      async (_progress, cancellationToken) => {
+        const controller = new AbortController();
+        const cancellation = cancellationToken.onCancellationRequested(() => controller.abort());
+        try {
+          const files = await collectFiles(
+            rootPath,
+            includeMatchers,
+            excludeMatchers,
+            allowedExtensions,
+            excludeExtensions,
+            maxFileSizeKB,
+            outputAbsolute,
+            {
+              maxFiles: 10000,
+              maxBytes: 64 * 1024 * 1024,
+              maxDepth: 128,
+              maxVisitedEntries: 50000,
+              signal: controller.signal,
+            }
+          );
 
-        const content = files.map((file) => renderBlock(file, config.outputFormat)).join('');
-        await fs.promises.writeFile(outputAbsolute, content, 'utf8');
+          if (controller.signal.aborted) throw cancellationError();
+          const content = files.map((file) => renderBlock(file, config.outputFormat)).join('');
+          if (controller.signal.aborted) throw cancellationError();
+          await atomicWriteFile(outputAbsolute, content, { signal: controller.signal });
 
-        const document = await vscode.workspace.openTextDocument(outputAbsolute);
-        await vscode.window.showTextDocument(document, { preview: false });
+          const document = await vscode.workspace.openTextDocument(outputAbsolute);
+          await vscode.window.showTextDocument(document, { preview: false });
 
-        vscode.window.showInformationMessage(
-          `Codebase Combiner: combined ${files.length} file(s) into ${path.basename(outputAbsolute)}.`
-        );
+          vscode.window.showInformationMessage(
+            `Codebase Combiner: combined ${files.length} file(s) into ${path.basename(outputAbsolute)}${files.skippedByWorkspaceLimit ? `; skipped ${files.skippedByWorkspaceLimit} item(s) at workspace safety limits` : ''}.`
+          );
+        } finally {
+          cancellation.dispose();
+        }
       }
     );
   } catch (err) {
+    if (err.name === 'AbortError') {
+      vscode.window.showInformationMessage('Codebase Combiner: combination cancelled.');
+      return;
+    }
     vscode.window.showErrorMessage(`Codebase Combiner failed: ${err.message}`);
   }
+}
+
+function cancellationError() {
+  const error = new Error('Combination cancelled.');
+  error.name = 'AbortError';
+  return error;
 }
 
 function getConfig() {
@@ -186,14 +221,17 @@ async function pickWorkspaceFolder() {
   return pick ? pick.folder : null;
 }
 
-async function promptForOutputFileName(defaultName) {
-  const value = await vscode.window.showInputBox({
-    prompt: 'Output file name (saved in the chosen root unless absolute)',
-    value: defaultName,
-    ignoreFocusOut: true,
-    validateInput: (text) => (!text || !text.trim() ? 'File name is required' : undefined),
+async function promptForOutputPath(rootPath, defaultName) {
+  const uri = await vscode.window.showSaveDialog({
+    defaultUri: vscode.Uri.file(path.join(rootPath, safeOutputFileName(defaultName))),
+    filters: {
+      'Text and Markdown': ['txt', 'md'],
+      'All Files': ['*'],
+    },
+    saveLabel: 'Combine',
+    title: 'Choose combined output file',
   });
-  return value ? value.trim() : undefined;
+  return uri?.fsPath;
 }
 
 async function promptForFilters(config) {

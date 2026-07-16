@@ -473,6 +473,60 @@ final class OutputStoreTests: XCTestCase {
         XCTAssertNil(reloadedStore.recoveredDraft)
     }
 
+    func testRecoveredDraftLoadDoesNotOrphanAnInFlightBuild() async {
+        let drafts = ControlledDraftStore(draft: .fixture(text: "older recovered source"))
+        let builder = SuspendedOutputBuilder()
+        let store = OutputStore(
+            drafts: drafts,
+            clipboard: RecordingClipboard(),
+            builder: builder
+        )
+        let file = FileNode.fixture(
+            relativePath: "notes.txt",
+            tokenCount: 1,
+            sizeBytes: 5,
+            content: "current source"
+        )
+
+        let rebuild = Task { await store.rebuild(files: [file], rootPath: nil) }
+        await builder.waitUntilRequested()
+        await store.loadRecoveredDraft()
+        await builder.complete()
+        await rebuild.value
+
+        XCTAssertFalse(store.isBuilding)
+        XCTAssertTrue(store.currentPayload?.contains("current source") == true)
+        XCTAssertTrue(store.recoveredDraft?.text.contains("current source") == true)
+    }
+
+    func testConfirmedClearDoesNotOrphanAnInFlightBuild() async {
+        let drafts = ControlledDraftStore(draft: .fixture(text: "older recovered source"))
+        let builder = SuspendedOutputBuilder()
+        let store = OutputStore(
+            drafts: drafts,
+            clipboard: RecordingClipboard(),
+            builder: builder
+        )
+        await store.loadRecoveredDraft()
+        let file = FileNode.fixture(
+            relativePath: "notes.txt",
+            tokenCount: 1,
+            sizeBytes: 5,
+            content: "current source"
+        )
+
+        let rebuild = Task { await store.rebuild(files: [file], rootPath: nil) }
+        await builder.waitUntilRequested()
+        store.requestClearRecoveredOutput()
+        await store.confirmClearRecoveredOutput()
+        await builder.complete()
+        await rebuild.value
+
+        XCTAssertFalse(store.isBuilding)
+        XCTAssertTrue(store.currentPayload?.contains("current source") == true)
+        XCTAssertTrue(store.recoveredDraft?.text.contains("current source") == true)
+    }
+
     func testBackgroundOutputBuilderRunsPayloadAndMetadataWorkOffMainThread() async {
         let recorder = ThreadRecorder()
         let builder = BackgroundOutputBuilder(onBuild: {
@@ -744,6 +798,44 @@ private actor RetryRaceDraftStore: DraftPersisting {
     func completeRetry() {
         retryContinuation?.resume()
         retryContinuation = nil
+    }
+}
+
+private actor SuspendedOutputBuilder: OutputBuilding {
+    private var input: OutputBuildInput?
+    private var continuation: CheckedContinuation<BuiltOutput, Never>?
+
+    func build(_ input: OutputBuildInput) async -> BuiltOutput {
+        self.input = input
+        return await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func waitUntilRequested() async {
+        while input == nil {
+            await Task.yield()
+        }
+    }
+
+    func complete() {
+        guard let input, let continuation else { return }
+        let payload = CombinedOutputBuilder().build(
+            promptPrefix: input.promptPrefix,
+            files: input.files,
+            format: input.format
+        )
+        let draft = ClipboardDraft(
+            text: payload,
+            format: input.format,
+            fileCount: input.files.count,
+            tokenCount: input.files.reduce(0) { $0 + $1.tokenCount },
+            byteCount: input.files.reduce(0) { $0 + $1.sizeBytes },
+            rootPath: input.rootPath,
+            generatedAt: Date(timeIntervalSince1970: 1_800_000_000)
+        )
+        self.continuation = nil
+        continuation.resume(returning: BuiltOutput(payload: payload, draft: draft))
     }
 }
 

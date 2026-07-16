@@ -7,15 +7,13 @@ protocol WorkspaceLoading: Sendable {
 
 struct LiveWorkspaceLoader: WorkspaceLoading {
     func load(rootURL: URL, preferences: AppPreferences.Values) async throws -> TreeLoadResult {
-        try await Task.detached(priority: .userInitiated) {
-            try TreeLoader().load(
-                rootURL: rootURL,
-                allowList: AppPreferences.extensionSet(from: preferences.allowList),
-                excludeList: AppPreferences.extensionSet(from: preferences.excludeList),
-                maxFileSizeKB: Int(preferences.maxFileSizeKB),
-                skipHidden: preferences.skipHidden
-            )
-        }.value
+        try TreeLoader().load(
+            rootURL: rootURL,
+            allowList: AppPreferences.extensionSet(from: preferences.allowList),
+            excludeList: AppPreferences.extensionSet(from: preferences.excludeList),
+            maxFileSizeKB: Int(preferences.maxFileSizeKB),
+            skipHidden: preferences.skipHidden
+        )
     }
 }
 

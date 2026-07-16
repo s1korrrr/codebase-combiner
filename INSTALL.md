@@ -13,7 +13,19 @@ This repo contains two deliverables:
   xcode-select --install
   ```
 - Swift 6.0+ (`swift --version` should show a 6.x toolchain).
-- Node.js 18+ and npm (for the VS Code extension).
+- Node.js 20+ and npm (for the VS Code extension packaging toolchain).
+
+## Install an official macOS release
+
+After an official release is published, download the DMG and `SHA256SUMS` from the same [GitHub Release](https://github.com/s1korrrr/codebase-combiner/releases). The planned 0.1.0 package is Apple silicon (`arm64`) and declares a macOS 13 deployment target. Runtime support is not considered proven until the direct-distribution checklist contains a successful macOS 13 clean-account smoke.
+
+Verify the download:
+
+```sh
+shasum -a 256 -c SHA256SUMS
+```
+
+Open `Codebase-Combiner-<version>-arm64.dmg`, drag **Codebase Combiner** to `/Applications`, and launch it normally from Finder. The official artifact is signed with Apple Developer ID and notarized; do not remove quarantine attributes or bypass Gatekeeper. If verification fails, delete the artifact and report it through `SECURITY.md`.
 
 ## VS Code extension (Node/JavaScript)
 
@@ -113,18 +125,20 @@ Then run:
 swiftformat .
 ```
 
-## Optional: create a local .app bundle
+## Create a local direct-distribution bundle
 
-For local App Store-style bundle validation:
+For local structural validation without distribution credentials:
 
 ```sh
-Packaging/AppStore/build_app_store_package.sh --skip-signing
-open "dist/app-store/Codebase Combiner.app"
+Packaging/DeveloperID/build_release.sh --skip-signing
+open "dist/developer-id/Codebase Combiner.app"
 ```
 
-This creates a sandbox-entitled, ad-hoc signed app bundle for local validation only. It is not uploadable to App Store Connect until it is signed with Apple distribution assets.
+This creates a sandbox-entitled, ad-hoc signed app and DMG for local validation only. It is not a public distributable. The default package is Apple silicon (`arm64`) only and includes a UUID-matched dSYM under `dist/developer-id/symbols/`.
 
-The script validates the ad-hoc signature with strict `codesign` verification. Gatekeeper can still reject an ad-hoc artifact because it has no Apple distribution identity or notarization ticket; that is expected and is different from an invalid on-disk signature.
+The script validates the app, mounted DMG contents, entitlements, architecture, hashes, source state, and ad-hoc signature. Gatekeeper rejects an ad-hoc artifact because it has no Developer ID trust chain or notarization ticket; that is expected.
+
+For the production signing and notarization path, see `Packaging/DeveloperID/README.md` and `RELEASING.md`.
 
 ## Isolated native E2E host
 
@@ -148,9 +162,9 @@ Remove app-owned E2E state, runtime files, fixtures, and exports afterward:
 ./script/build_and_run.sh --clean-e2e-state
 ```
 
-## Mac App Store packaging
+## Alternate Mac App Store packaging
 
-The repo includes a packaging pipeline under `Packaging/AppStore/`.
+The repository retains a separate optional pipeline under `Packaging/AppStore/`. It is not used for the direct GitHub download and has different identities, profiles, package format, and review requirements.
 
 Prerequisites for the real upload path:
 
@@ -177,13 +191,15 @@ Packaging/AppStore/build_app_store_package.sh \
   --provisioning-profile "/path/to/profile.provisionprofile"
 ```
 
+The signed path validates the profile platform, expiration, Team ID, exact bundle identifier, entitlements, and selected certificate before building. Any mismatch is a hard failure, as is a failed installer-signature check.
+
 The signed package, when produced, is written to:
 
 ```sh
 dist/app-store/CodebaseCombiner-AppStore.pkg
 ```
 
-Only after the signed package, embedded profile, account/app record, metadata, privacy declarations, and review inputs are verified should the owner upload it with Apple Transporter, Xcode, or another current Apple-supported upload path.
+Only after the signed package, embedded profile, account/app record, metadata, privacy declarations, screenshots, and review inputs are verified should the owner upload it with Apple Transporter, Xcode, or another current Apple-supported upload path.
 
 ## Legacy SwiftPM executable copy
 
@@ -206,4 +222,5 @@ If you only need the raw executable:
 
 - If `swift run` fails with missing tools, reinstall Xcode Command Line Tools (`xcode-select --install`).
 - If local bundle verification fails, rerun `Packaging/AppStore/build_app_store_package.sh --skip-signing` and inspect `codesign --verify --deep --strict --verbose=2 "dist/app-store/Codebase Combiner.app"`.
+- For the direct-release bundle, rerun `Packaging/DeveloperID/build_release.sh --skip-signing` and inspect the generated release manifest and checksum evidence under `dist/developer-id/`.
 - Do not interpret Gatekeeper rejection of the ad-hoc local bundle as a distribution-signature success or failure; verify the final distribution artifact separately after the matching profile and Apple-controlled assets are available.

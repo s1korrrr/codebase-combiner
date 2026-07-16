@@ -21,7 +21,10 @@ struct ContentView: View {
 
             workspace(layout: layout, frames: frames)
         }
-        .frame(minWidth: 960, minHeight: 640)
+        .frame(
+            minWidth: WindowContentSizePolicy.minimumWidth,
+            minHeight: WindowContentSizePolicy.minimumHeight
+        )
         .toolbar {
             workspaceToolbar
             outputToolbar

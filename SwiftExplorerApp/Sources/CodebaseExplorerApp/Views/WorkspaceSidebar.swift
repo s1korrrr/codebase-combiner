@@ -194,6 +194,8 @@ private extension ScanSkipReason {
             "Symbolic links"
         case .unreadable:
             "Unreadable"
+        case .workspaceLimit:
+            "Workspace limit"
         }
     }
 }

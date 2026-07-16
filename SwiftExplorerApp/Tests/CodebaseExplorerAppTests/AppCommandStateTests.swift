@@ -412,6 +412,66 @@ final class AppCommandStateTests: XCTestCase {
 
         XCTAssertEqual(controller.displayStatus, "Saved recoverable output.")
     }
+
+    func testSuccessfulRecoveryRetryClearsTheControllerFailureStatus() async throws {
+        let drafts = RecoveringControllerDraftStore()
+        let output = OutputStore(drafts: drafts, clipboard: ControllerClipboard())
+        let defaultsName = "recovery-status-tests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: defaultsName))
+        defer { defaults.removePersistentDomain(forName: defaultsName) }
+        let controller = AppController(
+            preferences: AppPreferences(defaults: defaults),
+            workspace: WorkspaceStore(),
+            output: output,
+            folderPicker: { nil },
+            saveDestinationPicker: { _ in nil }
+        )
+
+        await controller.start()
+        XCTAssertTrue(controller.displayStatus.contains("Could not load the recovered output"))
+        await drafts.allowLoads()
+
+        await output.loadRecoveredDraft()
+        await Task.yield()
+
+        XCTAssertEqual(controller.displayStatus, controller.workspace.status)
+    }
+
+    func testSaveCommitsTheExactPayloadShownWhenThePanelOpened() async throws {
+        let rootURL = URL(fileURLWithPath: "/save-snapshot")
+        let saver = RecordingControllerPayloadSaver()
+        let output = OutputStore(
+            drafts: ControllerDraftStore(),
+            clipboard: ControllerClipboard(),
+            saver: saver
+        )
+        let defaultsName = "save-snapshot-tests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: defaultsName))
+        defer { defaults.removePersistentDomain(forName: defaultsName) }
+        let destination = URL(fileURLWithPath: "/tmp/save-snapshot.md")
+        let controller = AppController(
+            preferences: AppPreferences(defaults: defaults),
+            workspace: WorkspaceStore(loader: RecordingControllerWorkspaceLoader(result: controllerTreeResult(rootURL: rootURL))),
+            output: output,
+            folderPicker: { nil },
+            saveDestinationPicker: { _ in
+                output.invalidateCurrentOutput()
+                return destination
+            }
+        )
+
+        await controller.scan(rootURL: rootURL)
+        await waitUntilController { controller.commandState.canExport }
+        let payloadAtPanelOpen = try XCTUnwrap(output.currentPayload)
+
+        controller.save()
+        let didWrite = await saver.waitUntilWritten()
+
+        let write = await saver.lastWrite
+        XCTAssertTrue(didWrite)
+        XCTAssertEqual(write?.text, payloadAtPanelOpen)
+        XCTAssertEqual(write?.url, destination)
+    }
 }
 
 private func controllerTreeResult(rootURL: URL) -> TreeLoadResult {
@@ -503,6 +563,47 @@ private actor ControllerDraftStore: DraftPersisting {
 
     func clear() async throws {
         draft = nil
+    }
+}
+
+private actor RecoveringControllerDraftStore: DraftPersisting {
+    private var shouldFailLoads = true
+
+    func load() async throws -> ClipboardDraft? {
+        if shouldFailLoads { throw ControllerDraftError.loadDenied }
+        return nil
+    }
+
+    func save(_: ClipboardDraft) async throws {}
+
+    func clear() async throws {}
+
+    func allowLoads() {
+        shouldFailLoads = false
+    }
+}
+
+private enum ControllerDraftError: LocalizedError {
+    case loadDenied
+
+    var errorDescription: String? {
+        "Draft load denied"
+    }
+}
+
+private actor RecordingControllerPayloadSaver: PayloadSaving {
+    private(set) var lastWrite: (text: String, url: URL)?
+
+    func save(_ text: String, to url: URL) async throws {
+        lastWrite = (text, url)
+    }
+
+    func waitUntilWritten() async -> Bool {
+        for _ in 0 ..< 10000 {
+            if lastWrite != nil { return true }
+            await Task.yield()
+        }
+        return false
     }
 }
 

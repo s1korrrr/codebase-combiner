@@ -1,7 +1,7 @@
 {
   "name": "codebase-combiner",
   "displayName": "Codebase Combiner",
-  "description": "Combine a workspace or folder into a single Markdown or text file with configurable filters and token estimates.",
+  "description": "Combine a workspace or folder into a single Markdown or text file with configurable filters.",
   "version": "0.0.1",
   "license": "MIT",
   "publisher": "s1korrrr",
@@ -31,7 +31,8 @@
     "token-count"
   ],
   "engines": {
-    "vscode": "^1.74.0"
+    "vscode": "^1.74.0",
+    "node": ">=20"
   },
   "categories": [
     "Productivity",
@@ -41,6 +42,15 @@
     "onCommand:codebaseCombiner.combineWorkspace",
     "onCommand:codebaseCombiner.combineFolder"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "Combining files requires access to a local file-system workspace."
+    }
+  },
   "main": "./extension.js",
   "contributes": {
     "commands": [
@@ -89,12 +99,14 @@
         "codebaseCombiner.outputFileName": {
           "type": "string",
           "default": "combined_code.txt",
-          "description": "File name for the combined output placed in the chosen root."
+          "description": "Suggested file name shown in the output save dialog."
         },
         "codebaseCombiner.includeGlobs": {
           "type": "array",
+          "maxItems": 128,
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 1024
           },
           "default": [
             "**/*"
@@ -103,8 +115,10 @@
         },
         "codebaseCombiner.excludeGlobs": {
           "type": "array",
+          "maxItems": 128,
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 1024
           },
           "default": [
             "**/node_modules/**",
@@ -142,6 +156,8 @@
         },
         "codebaseCombiner.maxFileSizeKB": {
           "type": "number",
+          "minimum": 1,
+          "maximum": 8192,
           "default": 512,
           "description": "Skip files larger than this size (in kilobytes)."
         },
@@ -154,21 +170,26 @@
     }
   },
   "scripts": {
-    "lint": "eslint .",
+    "lint": "eslint extension.js lib test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "mocha",
+    "test": "node --test",
     "package": "vsce package"
   },
   "dependencies": {
-    "minimatch": "^9.0.5"
+    "minimatch": "^9.0.9"
   },
   "devDependencies": {
-    "@vscode/vsce": "^3.7.1",
+    "@eslint/js": "^9.39.5",
+    "@vscode/vsce": "^3.9.2",
     "chai": "^4.4.1",
-    "eslint": "^8.57.0",
-    "eslint-config-prettier": "^9.1.0",
-    "mocha": "^10.4.0",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.5.0",
     "prettier": "^3.3.3"
+  },
+  "overrides": {
+    "diff": "8.0.3",
+    "serialize-javascript": "7.0.7"
   }
 }

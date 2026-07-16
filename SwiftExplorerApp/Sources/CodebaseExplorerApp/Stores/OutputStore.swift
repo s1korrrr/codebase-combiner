@@ -48,6 +48,10 @@ final class OutputStore: ObservableObject {
         currentPayload != nil && !isBuilding
     }
 
+    var exportPayload: String? {
+        hasFreshCurrentPayload ? currentPayload : nil
+    }
+
     func invalidateCurrentOutput() {
         buildGeneration &+= 1
         isBuilding = true
@@ -126,7 +130,7 @@ final class OutputStore: ObservableObject {
     }
 
     func loadRecoveredDraft() async {
-        let recoveryRevision = beginRecoveryOperation(cancelPendingBuild: true)
+        let recoveryRevision = beginRecoveryOperation(cancelPendingBuild: false)
         isClearConfirmationPresented = false
         do {
             let draft = try await persistence.load()
@@ -191,14 +195,18 @@ final class OutputStore: ObservableObject {
     }
 
     func saveCurrent(to url: URL) async {
-        guard let currentPayload else {
+        guard let exportPayload else {
             status = "There is no current output to save. Select at least one file and try again."
             return
         }
 
+        await save(exportPayload, to: url)
+    }
+
+    func save(_ payload: String, to url: URL) async {
         do {
-            let characterCount = currentPayload.count
-            try await saver.save(currentPayload, to: url)
+            let characterCount = payload.count
+            try await saver.save(payload, to: url)
             status = "Saved the current output to \(url.lastPathComponent)."
             telemetry.record(.currentSaveSucceeded(characterCount: characterCount))
         } catch {
@@ -218,7 +226,7 @@ final class OutputStore: ObservableObject {
 
     func confirmClearRecoveredOutput() async {
         guard isClearConfirmationPresented else { return }
-        let recoveryRevision = beginRecoveryOperation(cancelPendingBuild: true)
+        let recoveryRevision = beginRecoveryOperation(cancelPendingBuild: false)
 
         do {
             try await persistence.clear()

@@ -14,3 +14,24 @@ TODO.md
 MEMORY.md
 .worktrees/
 .superpowers/
+
+# Apple signing and notarization secrets
+*.p12
+AuthKey_*.p8
+*.key
+*.pem
+*.keychain
+*.keychain-db
+*.mobileprovision
+*.provisionprofile
+
+# Local credentials
+.env
+.env.*
+!.env.example
+
+# Release products
+*.dmg
+*.pkg
+*.xcarchive
+*.dSYM/
