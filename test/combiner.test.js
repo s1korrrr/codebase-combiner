@@ -49,6 +49,8 @@ describe('combiner helpers', () => {
       /at most two globstar segments/i
     );
     expect(() => buildMatchers(['**/Sources/**/*.swift'])).not.to.throw();
+    expect(() => buildMatchers(['[**][**][**].js'])).not.to.throw();
+    expect(() => buildMatchers(['foo**bar**baz**.js'])).not.to.throw();
   });
 
   it('derives allowed extensions from include globs', () => {
