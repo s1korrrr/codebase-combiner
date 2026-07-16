@@ -72,5 +72,6 @@ grep -F 'node_modules/**/.tap/**' .vscodeignore >/dev/null
 grep -F 'node_modules/**/.github/**' .vscodeignore >/dev/null
 grep -F 'node_modules/**/*.map' .vscodeignore >/dev/null
 grep -F 'node_modules/**/*.d.ts' .vscodeignore >/dev/null
+grep -F '.worktrees/**' .vscodeignore >/dev/null
 
 echo "Open-source release repository contract passed"

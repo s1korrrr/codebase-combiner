@@ -2,6 +2,7 @@
 .vscode/**
 .codex/**
 .superpowers/**
+.worktrees/**
 Packaging/**
 SwiftExplorerApp/**
 dist/**

@@ -111,7 +111,7 @@
           "default": [
             "**/*"
           ],
-          "description": "Glob patterns to include (relative to the chosen root)."
+          "description": "Glob patterns to include (relative to the chosen root); each pattern may contain at most two recursive ** segments."
         },
         "codebaseCombiner.excludeGlobs": {
           "type": "array",
@@ -127,7 +127,7 @@
             "**/dist/**",
             "**/build/**"
           ],
-          "description": "Glob patterns to exclude."
+          "description": "Glob patterns to exclude; each pattern may contain at most two recursive ** segments."
         },
         "codebaseCombiner.includeExtensions": {
           "type": "array",

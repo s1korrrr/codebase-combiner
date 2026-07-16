@@ -17,7 +17,7 @@ All notable changes to this project will be documented in this file.
 - Structured scan outcomes and skipped-file summaries.
 - Typed scan and persistence retry state with visible recovery controls.
 - An isolated sandboxed E2E host with synthetic fixtures, exact-PID ownership, deterministic window sizing, and scoped cleanup.
-- Current native audit screenshots and a complete interaction/performance report under `docs/audit/`.
+- A single current interaction, performance, security, packaging, and release audit under `docs/audit/`.
 
 ### Changed
 
@@ -30,6 +30,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Rejected glob patterns with more than two recursive `**` segments before matching so adversarial patterns cannot stall the extension.
+- Excluded local Git worktrees from VSIX packaging and made the package inventory contract reject worktree leakage.
 - Prevented stale scans and asynchronous output/recovery completions from overwriting newer state.
 - Rejected symbolic links before file metadata or content reads so scans cannot follow in-root or escaping link targets.
 - Reserved a non-overlapping preparation region for every visible pane combination at compact, regular, and wide widths.
