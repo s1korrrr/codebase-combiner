@@ -1,5 +1,9 @@
 # Codebase Combiner 0.1.0 Direct Distribution Checklist
 
+> Historical checklist captured on 2026-07-15 for source commit
+> `ee53940423a87185c2f87329b54c0617da678910`. Re-run every unchecked external
+> gate and regenerate artifact evidence for any newer candidate.
+
 - [x] Public MIT-licensed source repository.
 - [x] Separate Developer ID and Mac App Store packaging lanes.
 - [x] App Sandbox and user-selected read/write entitlements reviewed.

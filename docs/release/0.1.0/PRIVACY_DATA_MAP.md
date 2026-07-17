@@ -14,7 +14,7 @@ Repository inspection supports a **Data Not Collected** implementation claim, su
 - Network client/server entitlements: none.
 - ATT/tracking: not used.
 - Accounts, authentication, payments, ads, analytics, crash-reporting SDKs, backend, cloud sync: absent.
-- Privacy manifest: `Packaging/AppStore/PrivacyInfo.xcprivacy`, declares no tracking or collected data and declares the UserDefaults required-reason API category with reason `CA92.1`.
+- Privacy manifests: `Packaging/AppStore/PrivacyInfo.xcprivacy` and `Packaging/DeveloperID/PrivacyInfo.xcprivacy` declare no tracking or collected data, UserDefaults reason `CA92.1`, and File Timestamp reasons `3B52.1`/`C617.1` for user-selected files and app-container metadata.
 - Public privacy policy: [docs/privacy-policy.md](../../privacy-policy.md); linked in-app and from README.
 
 Owner blocker: confirm that no out-of-repository service, future telemetry, support intake, or distribution-layer collection changes these answers before selecting “Data Not Collected.”

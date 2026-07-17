@@ -1,8 +1,12 @@
 # Codebase Combiner 0.1.0 (1) Release Status
 
+> Historical snapshot from 2026-07-15 at commit
+> `ee53940423a87185c2f87329b54c0617da678910`. Current readiness must be evaluated
+> from a fresh candidate build and its generated evidence, not from this dossier.
+
 ## Final verdict
 
-**BLOCKED** — repository and local package preparation are green, but a production Mac App Store archive/package cannot be created or validated without a matching provisioning profile. Required App Store Connect owner declarations, compliant screenshots, minimum-macOS runtime evidence, and accessibility interaction evidence also remain unverified.
+**BLOCKED (historical)** — repository and local package preparation were green for this snapshot, but a production Mac App Store archive/package could not be created or validated without a matching provisioning profile. Required App Store Connect owner declarations, compliant screenshots, minimum-macOS runtime evidence, and accessibility interaction evidence also remained unverified.
 
 - Date checked: 2026-07-15 (Europe/Warsaw)
 - Shipping targets: macOS SwiftPM app and VS Code extension; iOS/iPadOS targets are **NOT APPLICABLE**.
@@ -37,7 +41,7 @@
 | App Store metadata draft              | PASS (draft)   | length/content review                                                | [APP_STORE_CHECKLIST.md](APP_STORE_CHECKLIST.md)                                   | Owner approval required                                                |
 | Screenshots                           | BLOCKED        | dimension inventory vs Apple specification                           | no current capture has an accepted exact macOS size                                | Owner: capture from final signed build                                 |
 | iOS/iPadOS release QA                 | NOT APPLICABLE | target/package inspection                                            | no iOS shipping target                                                             | None                                                                   |
-| TestFlight                            | NOT APPLICABLE | platform/release-channel inspection                                  | macOS-only direct App Store candidate; no upload                                   | None                                                                   |
+| TestFlight                            | BLOCKED        | platform/release-channel inspection                                  | No Mac App Store package has been uploaded; no TestFlight build exists             | Upload an approved App Store candidate before beta distribution        |
 
 ## Devices and environments tested
 

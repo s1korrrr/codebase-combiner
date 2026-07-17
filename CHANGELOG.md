@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- JS unit tests with Mocha/Chai and Swift XCTest coverage.
+- JS unit tests with Node's built-in test runner and Chai assertions, plus Swift XCTest coverage.
 - ESLint/Prettier and SwiftFormat configuration.
 - CI workflow for linting, formatting, and tests.
 - Open-source documentation (README, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY).
@@ -21,6 +21,12 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Advanced the VSIX candidate version to `0.0.2` so the hardened package has an unambiguous artifact identity.
+- Hardened both scanners against symbolic-link roots, special-file blocking, malformed persisted size values, locale-dependent bounded selection, silent traversal errors, and forged plain-text path headers.
+- Added structured VSIX skip summaries and Restricted Mode configuration boundaries while preserving explicitly empty one-run filters.
+- Declared Apple file-timestamp required-reason APIs, embedded the MIT license in App Store bundles, and added source-bound App Store manifests, checksums, and operation locking.
+- Made notarization resolve SBOM and symbols from the release manifest and hardened CI signing-file permissions.
+- Prevented concurrent or orphaned E2E hosts from sharing and resetting the same sandbox state.
 - Rebuilt the macOS app as an adaptive three-workarea utility that remains usable at 960×640 and independently hides the workspace sidebar and output inspector.
 - Consolidated app actions into shared menu, shortcut, toolbar, and button handlers and reduced Settings to one canonical macOS scene.
 - Kept macOS 13 as the deployment floor while confining macOS 26 presentation to a bounded availability-gated style boundary.

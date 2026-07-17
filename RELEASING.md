@@ -34,6 +34,10 @@ swiftformat --lint . --disable redundantSendable
 Packaging/DeveloperID/tests/run_tests.sh
 ```
 
+This produces a local VSIX candidate only. Marketplace publication remains an
+external release action and requires the configured publisher credential,
+release tag/checksum/provenance agreement, green CI, and explicit owner approval.
+
 The checked v0.1.0 artifact is Apple silicon (`arm64`) only. Do not claim Intel or universal support until a separate x86_64 build and runtime smoke have been completed.
 
 ## Developer ID candidate

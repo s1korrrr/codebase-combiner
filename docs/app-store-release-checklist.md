@@ -8,7 +8,7 @@ Statuses are deliberately limited to `verified`, `blocked`, and `not applicable`
 | --------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | Apple Developer Program team confirmed for this app | blocked  | Valid local signing identities exist, but current Apple Developer/App Store Connect team access was not inspected or changed. |
 | Bundle identifier registered                        | blocked  | The local bundle uses `com.s1korrrr.codebasecombiner`; registration was not checked in Apple Developer.                       |
-| App Store Connect app record exists                 | blocked  | No account access or external write was authorized.                                                                           |
+| App Store Connect app record exists                 | blocked  | No Apple-account access or App Store Connect write was performed.                                                             |
 | Version and build numbers set                       | verified | Ad-hoc bundle reports version `0.1.0`, build `1`.                                                                             |
 
 ## Signing And Sandbox
@@ -28,7 +28,7 @@ Statuses are deliberately limited to `verified`, `blocked`, and `not applicable`
 | Item                                                       | Status   | Evidence                                                                                                                                              |
 | ---------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Data collection inventory complete for repository behavior | verified | Local source files, prompt prefix, preferences, and one recoverable payload; no app networking, tracking, or analytics.                               |
-| Privacy manifest present and valid                         | verified | `PrivacyInfo.xcprivacy` parses; UserDefaults reason `CA92.1`, tracking false, collected-data list empty.                                              |
+| Privacy manifest present and valid                         | verified | `PrivacyInfo.xcprivacy` parses; UserDefaults reason `CA92.1`, file-timestamp reasons `3B52.1`/`C617.1`, tracking false, collected-data list empty.    |
 | Privacy labels confirmed in App Store Connect              | blocked  | Owner must enter and confirm the declarations against the submitted build.                                                                            |
 | Permission purpose strings reviewed                        | verified | The app uses user-selected folder/save panels and no camera, microphone, location, contacts, or similar protected service.                            |
 | Third-party SDK privacy reviewed                           | verified | The Swift package has no third-party dependency.                                                                                                      |
@@ -38,12 +38,12 @@ Statuses are deliberately limited to `verified`, `blocked`, and `not applicable`
 
 | Item                                           | Status   | Evidence                                                                                                                                                                  |
 | ---------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit and boundary tests pass                   | verified | Final holistic-fix run: `swift test` passed 100 tests and `npm test` passed 4 tests; the commands are recorded in the audit report.                                       |
-| Format/lint checks pass                        | verified | SwiftFormat checked 45 files; ESLint and Prettier passed.                                                                                                                 |
+| Unit and boundary tests pass                   | verified | Final audit run: `swift test` passed 125 tests and `npm test` passed 29 tests; the commands are recorded in the audit report.                                             |
+| Format/lint checks pass                        | verified | Exact CI SwiftFormat 0.61.1 checked 47 files; ESLint and Prettier passed.                                                                                                 |
 | Release build succeeds with warnings as errors | verified | `swift build -c release -Xswiftc -warnings-as-errors` passed with Xcode 26.6/SDK 26.5.                                                                                    |
 | Ad-hoc App Store-style bundle assembles        | verified | Bundle ID `com.s1korrrr.codebasecombiner`, version `0.1.0` (1), minimum macOS `13.0`; strict signature verifies.                                                          |
-| Clean launch of packaged artifact              | verified | `./script/build_and_run.sh --verify` launched, rechecked, terminated, and reaped exact PID `76936`; stdout/stderr were empty.                                             |
-| Primary workflow interaction sweep             | blocked  | Historical matrix passed, but changed pane geometry still needs a fresh loaded-workspace exact-PID stress after macOS permission prompts blocked UI automation.           |
+| Clean launch of packaged artifact              | verified | `./script/build_and_run.sh --verify` launched, rechecked, terminated, and reaped exact PID `75425`; stdout/stderr and app error/fault logs were empty.                    |
+| Primary workflow interaction sweep             | verified | Fresh sandboxed 960x640 E2E covered folder selection, filtering, selection, prompt/format changes, preview, copy, save, recovery, and concealment.                        |
 | Destructive recovery clear through UI          | blocked  | Cancel was verified; final destructive Computer Use action was not authorized. Store-level confirmed-clear and retry tests pass.                                          |
 | Accessibility and appearance variants          | blocked  | Labels/help/dark appearance are verified; VoiceOver plus light, Reduce Motion, increased contrast, larger text, and reduced-transparency system variants were not forced. |
 | macOS 13 runtime smoke                         | blocked  | The binary and plist declare 13.0, but this audit ran on macOS 27; a macOS 13 machine/VM was not available.                                                               |
@@ -65,7 +65,7 @@ Statuses are deliberately limited to `verified`, `blocked`, and `not applicable`
 
 ## Release Decision
 
-- Repository-ready: **no**, pending holistic re-review and refreshed signed loaded-workspace pane/screenshots evidence.
+- Repository-ready: **yes**, with the independent Critical/Important diff review approved; hosted PR CI remains the merge gate.
 - Package-ready: **yes for local ad-hoc validation only**; the `.app` has a strict-valid ad-hoc signature, macOS 13 minimum, privacy manifest, and minimal sandbox entitlements.
 - Ready for App Store Connect upload: **no**.
 - External blockers: matching provisioning profile, verified team/app record, distribution-signed app and installer package, metadata, screenshots, privacy/legal declarations, upload, and Apple review.

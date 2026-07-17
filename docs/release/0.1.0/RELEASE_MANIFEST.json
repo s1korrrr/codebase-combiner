@@ -1,6 +1,9 @@
 {
   "schemaVersion": 1,
   "generatedAt": "2026-07-15T15:15:00+02:00",
+  "snapshotStatus": "historical",
+  "sourceCommit": "ee53940423a87185c2f87329b54c0617da678910",
+  "sourceState": "clean",
   "verdict": "BLOCKED",
   "product": {
     "name": "Codebase Combiner",

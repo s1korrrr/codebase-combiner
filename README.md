@@ -110,7 +110,7 @@ The current implementation was built with Xcode 26.6 and the macOS 26.5 SDK. Run
 
 ## Quality gates
 
-- JS: ESLint + Prettier + Mocha
+- JS: Node's built-in test runner with Chai assertions, ESLint, and Prettier
 - Swift: XCTest + SwiftFormat
 - CI: GitHub Actions runs all quality gates on PRs
 

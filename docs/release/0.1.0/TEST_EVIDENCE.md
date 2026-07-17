@@ -1,6 +1,8 @@
 # Test Evidence
 
-Fresh evidence captured on 2026-07-15 from the isolated release worktree.
+Historical evidence captured on 2026-07-15 from the isolated release worktree at
+commit `ee53940423a87185c2f87329b54c0617da678910`. These counts and artifact hashes
+describe that immutable snapshot; they are not the current branch's audit results.
 
 | Area                      | Command                                                                                              | Result                                                                         |
 | ------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
