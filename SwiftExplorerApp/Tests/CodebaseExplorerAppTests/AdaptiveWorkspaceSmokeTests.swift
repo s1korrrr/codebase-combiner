@@ -73,7 +73,7 @@ final class AdaptiveWorkspaceSmokeTests: XCTestCase {
         )
         XCTAssertEqual(
             WorkspaceAccessibility.partialScanSummary(skippedCount: 3),
-            "3 files were skipped during the scan. Review counts by reason; file paths stay private."
+            "3 items were skipped during the scan. Review counts by reason; paths stay private."
         )
     }
 

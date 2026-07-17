@@ -6,7 +6,21 @@ final class AppPreferencesTests: XCTestCase {
     func testValidationRejectsSizeOutsideSupportedRange() {
         XCTAssertEqual(AppPreferences.validate(maxFileSizeKB: 31), .invalid("Enter a value from 32 to 8,192 KB."))
         XCTAssertEqual(AppPreferences.validate(maxFileSizeKB: 8193), .invalid("Enter a value from 32 to 8,192 KB."))
+        XCTAssertEqual(AppPreferences.validate(maxFileSizeKB: .nan), .invalid("Enter a value from 32 to 8,192 KB."))
+        XCTAssertEqual(AppPreferences.validate(maxFileSizeKB: .infinity), .invalid("Enter a value from 32 to 8,192 KB."))
         XCTAssertEqual(AppPreferences.validate(maxFileSizeKB: 512), .valid)
+    }
+
+    @MainActor
+    func testMalformedPersistedMaximumFileSizeIsNormalizedBeforePublishing() throws {
+        for malformedValue in [Double.nan, .infinity, -.infinity, Double.greatestFiniteMagnitude] {
+            let suiteName = "AppPreferencesTests.malformed.\(UUID().uuidString)"
+            let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+            defer { defaults.removePersistentDomain(forName: suiteName) }
+            defaults.set(malformedValue, forKey: "cc_maxFileSizeKB")
+
+            XCTAssertEqual(AppPreferences(defaults: defaults).values.maxFileSizeKB, 512)
+        }
     }
 
     func testExtensionParserNormalizesDotsCaseAndDelimiters() {

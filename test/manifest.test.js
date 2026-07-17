@@ -11,9 +11,34 @@ describe('extension manifest', () => {
     });
   });
 
-  it('declares safe support for untrusted workspaces', () => {
+  it('ignores workspace-controlled filters in Restricted Mode', () => {
     expect(manifest.capabilities?.untrustedWorkspaces).to.deep.equal({
-      supported: true,
+      supported: 'limited',
+      description:
+        'Workspace-defined filters are ignored in Restricted Mode so an untrusted repository cannot broaden file collection.',
+      restrictedConfigurations: [
+        'codebaseCombiner.outputFormat',
+        'codebaseCombiner.outputFileName',
+        'codebaseCombiner.includeGlobs',
+        'codebaseCombiner.excludeGlobs',
+        'codebaseCombiner.includeExtensions',
+        'codebaseCombiner.excludeExtensions',
+        'codebaseCombiner.maxFileSizeKB',
+        'codebaseCombiner.useExtensionsFilter',
+      ],
     });
+  });
+
+  it('bounds every array configuration accepted from settings', () => {
+    for (const key of [
+      'codebaseCombiner.includeGlobs',
+      'codebaseCombiner.excludeGlobs',
+      'codebaseCombiner.includeExtensions',
+      'codebaseCombiner.excludeExtensions',
+    ]) {
+      const property = manifest.contributes.configuration.properties[key];
+      expect(property.maxItems, key).to.equal(128);
+      expect(property.items.maxLength, key).to.equal(1024);
+    }
   });
 });

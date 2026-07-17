@@ -2,7 +2,7 @@
   "name": "codebase-combiner",
   "displayName": "Codebase Combiner",
   "description": "Combine a workspace or folder into a single Markdown or text file with configurable filters.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "publisher": "s1korrrr",
   "author": "Rafal Sikora",
@@ -44,7 +44,18 @@
   ],
   "capabilities": {
     "untrustedWorkspaces": {
-      "supported": true
+      "supported": "limited",
+      "description": "Workspace-defined filters are ignored in Restricted Mode so an untrusted repository cannot broaden file collection.",
+      "restrictedConfigurations": [
+        "codebaseCombiner.outputFormat",
+        "codebaseCombiner.outputFileName",
+        "codebaseCombiner.includeGlobs",
+        "codebaseCombiner.excludeGlobs",
+        "codebaseCombiner.includeExtensions",
+        "codebaseCombiner.excludeExtensions",
+        "codebaseCombiner.maxFileSizeKB",
+        "codebaseCombiner.useExtensionsFilter"
+      ]
     },
     "virtualWorkspaces": {
       "supported": false,
@@ -131,16 +142,20 @@
         },
         "codebaseCombiner.includeExtensions": {
           "type": "array",
+          "maxItems": 128,
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 1024
           },
           "default": [],
           "description": "Optional allow-list of file extensions (e.g. ['js','ts']). If empty, all extensions are allowed unless restricted by includeGlobs/useExtensionsFilter."
         },
         "codebaseCombiner.excludeExtensions": {
           "type": "array",
+          "maxItems": 128,
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 1024
           },
           "default": [
             "png",

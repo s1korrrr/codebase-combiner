@@ -8,9 +8,9 @@ const {
   collectFiles,
   renderBlock,
   safeOutputFileName,
-  stripDot,
   atomicWriteFile,
   normalizeMaxFileSizeKB,
+  parseRunFilterInput,
 } = require('./lib/combiner');
 
 function activate(context) {
@@ -55,7 +55,10 @@ async function handleCombineFolder(uri) {
 
   try {
     if (uri && uri.fsPath) {
-      const stats = await fs.promises.stat(uri.fsPath);
+      const stats = await fs.promises.lstat(uri.fsPath);
+      if (stats.isSymbolicLink()) {
+        throw new Error('Symbolic-link folder selections are not supported.');
+      }
       targetPath = stats.isDirectory() ? uri.fsPath : path.dirname(uri.fsPath);
     } else {
       const folder = await pickWorkspaceFolder();
@@ -150,8 +153,12 @@ async function combineRoot(rootPath, outputAbsolute, config) {
           const document = await vscode.workspace.openTextDocument(outputAbsolute);
           await vscode.window.showTextDocument(document, { preview: false });
 
+          const skipped = Object.entries(files.skipSummary)
+            .filter(([, count]) => count > 0)
+            .map(([reason, count]) => `${reason} ${count}`)
+            .join(', ');
           vscode.window.showInformationMessage(
-            `Codebase Combiner: combined ${files.length} file(s) into ${path.basename(outputAbsolute)}${files.skippedByWorkspaceLimit ? `; skipped ${files.skippedByWorkspaceLimit} item(s) at workspace safety limits` : ''}.`
+            `Codebase Combiner: combined ${files.length} file(s) into ${path.basename(outputAbsolute)}${skipped ? `; skipped items: ${skipped}` : ''}.`
           );
         } finally {
           cancellation.dispose();
@@ -300,36 +307,12 @@ async function promptForFilters(config) {
     return null;
   }
 
-  const includeGlobs = coercePatterns(splitPatterns(includeInput), config.includeGlobs || ['**/*']);
-  const excludeGlobs = coercePatterns(splitPatterns(excludeInput), config.excludeGlobs || []);
-  const includeExtensions = coercePatterns(
-    splitExtensions(includeExtInput),
-    config.includeExtensions || []
-  );
-  const excludeExtensions = coercePatterns(
-    splitExtensions(excludeExtInput),
-    config.excludeExtensions || []
-  );
+  const includeGlobs = parseRunFilterInput(includeInput, 'glob');
+  const excludeGlobs = parseRunFilterInput(excludeInput, 'glob');
+  const includeExtensions = parseRunFilterInput(includeExtInput, 'extension');
+  const excludeExtensions = parseRunFilterInput(excludeExtInput, 'extension');
 
   return { includeGlobs, excludeGlobs, includeExtensions, excludeExtensions };
-}
-
-function splitPatterns(text) {
-  return text
-    .split(/[\n,]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-function splitExtensions(text) {
-  return text
-    .split(/[\s,;|]+/)
-    .map((s) => stripDot(s.trim().toLowerCase()))
-    .filter(Boolean);
-}
-
-function coercePatterns(list, fallback) {
-  return list.length ? list : fallback;
 }
 
 module.exports = {

@@ -68,27 +68,24 @@ struct TreeLoader {
         var acceptedByteCount = 0
         var visitedEntryCount = 0
 
-        func boundedChildren(at url: URL) throws -> [URL]? {
+        func boundedChildren(at url: URL) throws -> [URL] {
             guard visitedEntryCount < limits.maxVisitedEntries else {
                 throw TreeLoaderError.workspaceTraversalLimit(limits.maxVisitedEntries)
             }
-            guard let enumerator = FileManager.default.enumerator(
+            let children = try FileManager.default.contentsOfDirectory(
                 at: url,
                 includingPropertiesForKeys: [.isSymbolicLinkKey],
-                options: [.skipsPackageDescendants, .skipsSubdirectoryDescendants],
-                errorHandler: { _, _ in false }
-            ) else { return nil }
+                options: [.skipsPackageDescendants]
+            )
 
-            var children: [URL] = []
-            while let child = enumerator.nextObject() as? URL {
+            for _ in children {
                 try Task.checkCancellation()
                 guard visitedEntryCount < limits.maxVisitedEntries else {
                     throw TreeLoaderError.workspaceTraversalLimit(limits.maxVisitedEntries)
                 }
                 visitedEntryCount += 1
-                children.append(child)
             }
-            return children.sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+            return children.sorted { lexicalPathPrecedes($0.lastPathComponent, $1.lastPathComponent) }
         }
 
         let rootLinkValues = try standardizedRoot.resourceValues(forKeys: [.isSymbolicLinkKey])
@@ -108,7 +105,7 @@ struct TreeLoader {
             }
             let name = url.lastPathComponent
 
-            if skipHidden, name.hasPrefix(".") {
+            if depth > 0, skipHidden, name.hasPrefix(".") {
                 summary.record(.hidden)
                 return nil
             }
@@ -127,7 +124,12 @@ struct TreeLoader {
             }
 
             if values.isDirectory == true {
-                guard let childrenURLs = try boundedChildren(at: url) else {
+                let childrenURLs: [URL]
+                do {
+                    childrenURLs = try boundedChildren(at: url)
+                } catch let error as TreeLoaderError {
+                    throw error
+                } catch {
                     summary.record(.unreadable)
                     return nil
                 }
@@ -145,6 +147,10 @@ struct TreeLoader {
                     content: nil
                 )
             } else {
+                guard values.isRegularFile == true else {
+                    summary.record(.unreadable)
+                    return nil
+                }
                 let ext = url.pathExtension.lowercased()
 
                 if excludeList.contains(ext) {
@@ -236,7 +242,7 @@ struct TreeLoader {
         expectedURL: URL,
         maximumBytes: Int
     ) -> SecureFileReadResult {
-        let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+        let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
         guard descriptor >= 0 else {
             return errno == ELOOP ? .symbolicLink : .unreadable
         }
@@ -277,6 +283,10 @@ struct TreeLoader {
         }
         return .oversized
     }
+}
+
+private func lexicalPathPrecedes(_ lhs: String, _ rhs: String) -> Bool {
+    lhs.utf8.lexicographicallyPrecedes(rhs.utf8)
 }
 
 private enum SecureFileReadResult {

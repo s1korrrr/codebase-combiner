@@ -216,7 +216,7 @@ final class WorkspaceStore: ObservableObject {
         ([node] + node.children.flatMap(flattenFiles))
             .filter { !$0.isDirectory }
             .sorted {
-                $0.relativePath.localizedCaseInsensitiveCompare($1.relativePath) == .orderedAscending
+                $0.relativePath.utf8.lexicographicallyPrecedes($1.relativePath.utf8)
             }
     }
 

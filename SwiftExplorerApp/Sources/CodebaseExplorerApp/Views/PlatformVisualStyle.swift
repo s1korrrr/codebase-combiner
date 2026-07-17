@@ -135,8 +135,8 @@ enum WorkspaceAccessibility {
     }
 
     static func partialScanSummary(skippedCount: Int) -> String {
-        let noun = skippedCount == 1 ? "file was" : "files were"
-        return "\(skippedCount) \(noun) skipped during the scan. Review counts by reason; file paths stay private."
+        let noun = skippedCount == 1 ? "item was" : "items were"
+        return "\(skippedCount) \(noun) skipped during the scan. Review counts by reason; paths stay private."
     }
 }
 

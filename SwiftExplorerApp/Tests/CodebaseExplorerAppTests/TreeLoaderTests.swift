@@ -1,4 +1,5 @@
 @testable import CodebaseExplorerApp
+import Darwin
 import Foundation
 import XCTest
 
@@ -41,6 +42,25 @@ final class TreeLoaderTests: XCTestCase {
             )
 
             XCTAssertEqual(result.root.flattened.filter { !$0.isDirectory }.map(\.relativePath), ["a.swift"])
+        }
+    }
+
+    func testLoadUsesLocaleIndependentLexicalOrderForBoundedSelection() throws {
+        try withTemporaryDirectory { root in
+            try writeFile(at: root.appendingPathComponent("a2.swift"), contents: "two")
+            try writeFile(at: root.appendingPathComponent("a10.swift"), contents: "ten")
+
+            let result = try TreeLoader(
+                limits: .init(maxFiles: 1, maxBytes: 1024, maxDepth: 8, maxVisitedEntries: 10)
+            ).load(
+                rootURL: root,
+                allowList: ["swift"],
+                excludeList: [],
+                maxFileSizeKB: 512,
+                skipHidden: true
+            )
+
+            XCTAssertEqual(result.root.flattened.filter { !$0.isDirectory }.map(\.relativePath), ["a10.swift"])
         }
     }
 
@@ -189,6 +209,28 @@ final class TreeLoaderTests: XCTestCase {
         }
     }
 
+    func testUnreadableNestedDirectoryIsReportedInsteadOfReturningSilentPartialSuccess() throws {
+        try withTemporaryDirectory { root in
+            try writeFile(at: root.appendingPathComponent("App.swift"), contents: "print(\"ok\")")
+            let unreadableDirectory = root.appendingPathComponent("Private", isDirectory: true)
+            try FileManager.default.createDirectory(at: unreadableDirectory, withIntermediateDirectories: true)
+            try writeFile(at: unreadableDirectory.appendingPathComponent("Secret.swift"), contents: "private")
+            XCTAssertEqual(chmod(unreadableDirectory.path, 0), 0)
+            defer { _ = chmod(unreadableDirectory.path, S_IRWXU) }
+
+            let result = try TreeLoader().load(
+                rootURL: root,
+                allowList: ["swift"],
+                excludeList: [],
+                maxFileSizeKB: 512,
+                skipHidden: true
+            )
+
+            XCTAssertEqual(result.root.flattened.filter { !$0.isDirectory }.map(\.relativePath), ["App.swift"])
+            XCTAssertEqual(result.summary.count(for: .unreadable), 1)
+        }
+    }
+
     func testLoadTreeAppliesFiltersAndSkipsBinaryAndLargeFiles() throws {
         try withTemporaryDirectory { root in
             try writeFile(at: root.appendingPathComponent("app.js"), contents: "console.log('ok')")
@@ -227,6 +269,62 @@ final class TreeLoaderTests: XCTestCase {
 
             let files = tree.flattened.filter { !$0.isDirectory }.map(\.relativePath)
             XCTAssertEqual(files, [".hidden.txt"])
+        }
+    }
+
+    func testExplicitHiddenWorkspaceRootRemainsScannableWhenNestedHiddenFilesAreSkipped() throws {
+        try withTemporaryDirectory { container in
+            let root = container.appendingPathComponent(".workspace", isDirectory: true)
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            try writeFile(at: root.appendingPathComponent("App.swift"), contents: "print(\"ok\")")
+            try writeFile(at: root.appendingPathComponent(".secret.swift"), contents: "private")
+
+            let result = try TreeLoader().load(
+                rootURL: root,
+                allowList: ["swift"],
+                excludeList: [],
+                maxFileSizeKB: 512,
+                skipHidden: true
+            )
+
+            XCTAssertEqual(result.root.flattened.filter { !$0.isDirectory }.map(\.relativePath), ["App.swift"])
+            XCTAssertEqual(result.summary.count(for: .hidden), 1)
+        }
+    }
+
+    func testFileSwapToFIFOIsRejectedWithoutBlockingForAWriter() throws {
+        try withTemporaryDirectory { root in
+            let source = root.appendingPathComponent("blocked.swift")
+            try writeFile(at: source, contents: "safe source")
+            let writerFinished = expectation(description: "delayed FIFO writer completed")
+
+            let loader = TreeLoader(beforeFileOpen: { url in
+                guard url.lastPathComponent == source.lastPathComponent else { return }
+                try? FileManager.default.removeItem(at: url)
+                XCTAssertEqual(mkfifo(url.path, S_IRUSR | S_IWUSR), 0)
+                DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
+                    let descriptor = Darwin.open(url.path, O_WRONLY | O_NONBLOCK)
+                    if descriptor >= 0 {
+                        Darwin.close(descriptor)
+                    }
+                    writerFinished.fulfill()
+                }
+            })
+
+            let started = ContinuousClock.now
+            let result = try loader.load(
+                rootURL: root,
+                allowList: ["swift"],
+                excludeList: [],
+                maxFileSizeKB: 512,
+                skipHidden: true
+            )
+            let elapsed = started.duration(to: .now)
+
+            XCTAssertLessThan(elapsed, .seconds(1))
+            XCTAssertEqual(result.summary.count(for: .unreadable), 1)
+            XCTAssertTrue(result.root.flattened.filter { !$0.isDirectory }.isEmpty)
+            wait(for: [writerFinished], timeout: 3)
         }
     }
 
