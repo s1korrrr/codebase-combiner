@@ -15,6 +15,7 @@ const {
   safeOutputFileName,
   atomicWriteFile,
   normalizeMaxFileSizeKB,
+  parseRunFilterInput,
 } = require('../lib/combiner');
 
 describe('combiner helpers', () => {
@@ -100,6 +101,86 @@ describe('combiner helpers', () => {
 
     const relativePaths = files.map((file) => file.relativePath).sort();
     expect(relativePaths).to.deep.equal(['app.js', 'notes.txt']);
+    expect(files.skipSummary).to.deep.equal({
+      binary: 0,
+      oversized: 1,
+      unreadable: 0,
+      symbolicLink: 0,
+      workspaceLimit: 0,
+    });
+  });
+
+  it('reports binary and symlink-race skips without leaking paths', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'combiner-skip-summary-'));
+    const outside = path.join(
+      await fs.mkdtemp(path.join(os.tmpdir(), 'combiner-skip-outside-')),
+      'outside.txt'
+    );
+    const swapped = path.join(root, 'swapped.txt');
+    await fs.writeFile(path.join(root, 'binary.txt'), Buffer.from([0, 1, 2]));
+    await fs.writeFile(swapped, 'inside');
+    await fs.writeFile(outside, 'outside');
+    await fs.symlink(outside, path.join(root, 'linked.txt'));
+
+    const files = await collectFiles(
+      root,
+      buildMatchers(['**/*']),
+      [],
+      buildExtensionSet(['txt']),
+      new Set(),
+      512,
+      path.join(root, 'combined.txt'),
+      {
+        beforeFileOpen: async (candidate) => {
+          if (candidate !== swapped) return;
+          await fs.unlink(swapped);
+          await fs.symlink(outside, swapped);
+        },
+      }
+    );
+
+    expect(files).to.have.length(0);
+    expect(files.skipSummary).to.deep.equal({
+      binary: 1,
+      oversized: 0,
+      unreadable: 0,
+      symbolicLink: 2,
+      workspaceLimit: 0,
+    });
+    expect(JSON.stringify(files.skipSummary)).not.to.include(root);
+    expect(JSON.stringify(files.skipSummary)).not.to.include(outside);
+  });
+
+  it('rejects a symbolic-link traversal root', async () => {
+    const realRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'combiner-real-root-'));
+    const parent = await fs.mkdtemp(path.join(os.tmpdir(), 'combiner-link-root-'));
+    const linkedRoot = path.join(parent, 'workspace');
+    await fs.writeFile(path.join(realRoot, 'secret.txt'), 'outside workspace');
+    await fs.symlink(realRoot, linkedRoot);
+
+    let error;
+    try {
+      await collectFiles(
+        linkedRoot,
+        buildMatchers(['**/*']),
+        [],
+        buildExtensionSet(['txt']),
+        new Set(),
+        512,
+        path.join(parent, 'combined.txt')
+      );
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error?.name).to.equal('RootSymlinkError');
+  });
+
+  it('preserves explicitly submitted empty run filters', () => {
+    expect(parseRunFilterInput('', 'glob')).to.deep.equal([]);
+    expect(parseRunFilterInput('', 'extension')).to.deep.equal([]);
+    expect(parseRunFilterInput('**/*.js, **/*.md', 'glob')).to.deep.equal(['**/*.js', '**/*.md']);
+    expect(parseRunFilterInput('.JS, swift', 'extension')).to.deep.equal(['js', 'swift']);
   });
 
   it('bounds aggregate file count and bytes', async () => {
@@ -324,6 +405,14 @@ describe('combiner helpers', () => {
     expect(block).to.include('`````markdown');
     expect(block).to.include('\n`````\n');
     expect(block).not.to.include('unsafe\n# heading');
+  });
+
+  it('renders plain-text headers safely when paths contain line separators', () => {
+    const block = renderBlock(
+      { relativePath: 'unsafe\r\n// File: forged.txt\u2028tail.txt', content: 'safe' },
+      'txt'
+    );
+    expect(block).to.equal('// File: unsafe // File: forged.txt tail.txt\nsafe\n\n');
   });
 
   it('preserves an existing destination when an atomic write is aborted', async () => {

@@ -222,6 +222,15 @@ final class WorkspaceStoreTests: XCTestCase {
         XCTAssertEqual(outcome, .accepted(fileCount: 2, selectedCount: 2, skippedCount: 0))
     }
 
+    func testAcceptedFilesUseLocaleIndependentLexicalOrder() async {
+        let result = TreeLoadResult.fileFixture(names: ["a2.swift", "a10.swift"])
+        let store = WorkspaceStore(loader: ImmediateWorkspaceLoader(result: result))
+
+        _ = await store.scan(rootURL: result.root.url, preferences: .init())
+
+        XCTAssertEqual(store.allFiles.map(\.name), ["a10.swift", "a2.swift"])
+    }
+
     func testAcceptedScanPublishesStructuredSummary() async {
         let fixture = TreeLoadResult.twoFileFixture
         var summary = ScanSummary()

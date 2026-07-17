@@ -28,7 +28,9 @@ final class AppPreferences: ObservableObject {
         values = Values(
             allowList: defaults.string(forKey: "cc_allowListString") ?? Values().allowList,
             excludeList: defaults.string(forKey: "cc_excludeListString") ?? Values().excludeList,
-            maxFileSizeKB: defaults.object(forKey: "cc_maxFileSizeKB") as? Double ?? 512,
+            maxFileSizeKB: Self.normalizedMaximumFileSize(
+                defaults.object(forKey: "cc_maxFileSizeKB") as? Double
+            ),
             skipHidden: defaults.object(forKey: "cc_skipHidden") as? Bool ?? true,
             outputMarkdown: defaults.object(forKey: "cc_outputMarkdown") as? Bool ?? true,
             showFilters: defaults.object(forKey: "cc_showFilters") as? Bool ?? true
@@ -36,9 +38,14 @@ final class AppPreferences: ObservableObject {
     }
 
     nonisolated static func validate(maxFileSizeKB: Double) -> Validation {
-        (32 ... 8192).contains(maxFileSizeKB)
+        maxFileSizeKB.isFinite && (32 ... 8192).contains(maxFileSizeKB)
             ? .valid
             : .invalid("Enter a value from 32 to 8,192 KB.")
+    }
+
+    private nonisolated static func normalizedMaximumFileSize(_ value: Double?) -> Double {
+        guard let value, validate(maxFileSizeKB: value) == .valid else { return 512 }
+        return value
     }
 
     nonisolated static func extensionSet(from text: String) -> Set<String> {

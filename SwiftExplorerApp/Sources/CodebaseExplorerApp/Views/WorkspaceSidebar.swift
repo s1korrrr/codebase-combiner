@@ -91,8 +91,8 @@ struct WorkspaceSidebar: View {
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }
-        .help("Show skipped-file counts by reason. File paths are not shown.")
-        .accessibilityHint("Shows skipped-file counts by reason without revealing file paths")
+        .help("Show skipped-item counts by reason. Paths are not shown.")
+        .accessibilityHint("Shows skipped-item counts by reason without revealing paths")
     }
 
     private func scanFailure(_ failure: WorkspaceScanFailure) -> some View {
