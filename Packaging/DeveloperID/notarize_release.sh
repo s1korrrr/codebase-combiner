@@ -150,6 +150,7 @@ write_resume_command() {
   local resume_path="$NOTARY_DIR/resume-command.txt"
   printf 'Packaging/DeveloperID/notarize_release.sh --dmg %q --keychain-profile %q' \
     "$DMG_PATH" "$KEYCHAIN_PROFILE" > "$resume_path"
+  printf ' --app-name %q' "$APP_NAME" >> "$resume_path"
   if [[ -n "$KEYCHAIN_PATH" ]]; then
     printf ' --keychain %q' "$KEYCHAIN_PATH" >> "$resume_path"
   fi

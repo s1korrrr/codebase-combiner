@@ -353,6 +353,7 @@ if SUBMIT_FAIL_WITH_ID=1 run_notary >/dev/null 2>&1; then
 fi
 test -f "$TMP_DIR/notarization/resume-command.txt"
 grep -F -- '--submission-id submission-123' "$TMP_DIR/notarization/resume-command.txt" >/dev/null
+grep -F -- '--app-name Codebase\ Combiner' "$TMP_DIR/notarization/resume-command.txt" >/dev/null
 if grep -F 'stapler staple' "$LOG"; then
   echo "Interrupted submission must not staple the artifact." >&2
   exit 1
