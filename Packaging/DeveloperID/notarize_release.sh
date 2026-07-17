@@ -96,9 +96,38 @@ SUMMARY_JSON="$NOTARY_DIR/summary.json"
 FINAL_CHECKSUMS="$DIST_DIR/SHA256SUMS"
 MANIFEST_PATH="$DIST_DIR/release-manifest.json"
 OPERATION_LOCK="$DIST_DIR/.release-operation.lock"
-SBOM_PATH="$(find "$DIST_DIR" -maxdepth 1 -type f -name '*.cdx.json' -print | sort | head -n 1)"
-SYMBOLS_PATH="$(find "$DIST_DIR" -maxdepth 1 -type f -name '*-symbols.zip' -print | sort | head -n 1)"
 [[ -f "$MANIFEST_PATH" ]] || { echo "Release manifest not found: $MANIFEST_PATH" >&2; exit 2; }
+artifact_names="$(python3 - "$MANIFEST_PATH" <<'PY'
+import json
+import os
+import sys
+
+try:
+    with open(sys.argv[1], encoding="utf-8") as handle:
+        manifest = json.load(handle)
+    product_name = manifest["product"]["name"]
+    artifacts = manifest["artifacts"]
+    names = [artifacts["sbom"], artifacts["symbols"]]
+    if not isinstance(product_name, str) or not product_name:
+        raise ValueError("product name must be a non-empty string")
+    if any(not isinstance(name, str) or not name or os.path.basename(name) != name for name in names):
+        raise ValueError("artifact names must be non-empty basenames")
+    print("\t".join([product_name, *names]))
+except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+    print(f"ERROR\t{error}")
+PY
+)"
+IFS=$'\t' read -r manifest_app_name sbom_basename symbols_basename <<< "$artifact_names"
+[[ "$manifest_app_name" != ERROR && -n "$manifest_app_name" && -n "$sbom_basename" && -n "$symbols_basename" ]] || {
+  echo "Unable to resolve release assets from manifest: ${sbom_basename:-malformed manifest}" >&2
+  exit 2
+}
+[[ "$APP_NAME" == "$manifest_app_name" ]] || {
+  echo "Requested app name '$APP_NAME' does not match release manifest product '$manifest_app_name'." >&2
+  exit 2
+}
+SBOM_PATH="$DIST_DIR/$sbom_basename"
+SYMBOLS_PATH="$DIST_DIR/$symbols_basename"
 [[ -n "$SBOM_PATH" && -f "$SBOM_PATH" ]] || { echo "Release SBOM not found." >&2; exit 2; }
 [[ -n "$SYMBOLS_PATH" && -f "$SYMBOLS_PATH" ]] || { echo "Release symbols archive not found." >&2; exit 2; }
 

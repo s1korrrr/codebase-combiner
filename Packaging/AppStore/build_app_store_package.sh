@@ -50,30 +50,37 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --bundle-id)
+      [[ $# -ge 2 ]] || { echo "Missing value for --bundle-id" >&2; exit 2; }
       BUNDLE_IDENTIFIER="$2"
       shift 2
       ;;
     --version)
+      [[ $# -ge 2 ]] || { echo "Missing value for --version" >&2; exit 2; }
       MARKETING_VERSION="$2"
       shift 2
       ;;
     --build-number)
+      [[ $# -ge 2 ]] || { echo "Missing value for --build-number" >&2; exit 2; }
       BUILD_NUMBER="$2"
       shift 2
       ;;
     --architecture)
+      [[ $# -ge 2 ]] || { echo "Missing value for --architecture" >&2; exit 2; }
       ARCHITECTURE="$2"
       shift 2
       ;;
     --signing-identity)
+      [[ $# -ge 2 ]] || { echo "Missing value for --signing-identity" >&2; exit 2; }
       SIGNING_IDENTITY="$2"
       shift 2
       ;;
     --installer-identity)
+      [[ $# -ge 2 ]] || { echo "Missing value for --installer-identity" >&2; exit 2; }
       INSTALLER_IDENTITY="$2"
       shift 2
       ;;
     --provisioning-profile)
+      [[ $# -ge 2 ]] || { echo "Missing value for --provisioning-profile" >&2; exit 2; }
       PROVISIONING_PROFILE="$2"
       shift 2
       ;;
@@ -147,6 +154,10 @@ EXPECTED_TEAM_ID=""
 SIGNING_ENTITLEMENTS="$ENTITLEMENTS"
 SOURCE_COMMIT="$(git -C "$ROOT_DIR" rev-parse HEAD)"
 SOURCE_STATE="clean"
+MANIFEST_PATH="$DIST_DIR/release-manifest.json"
+CHECKSUM_PATH="$DIST_DIR/SHA256SUMS"
+OPERATION_LOCK="$DIST_DIR/.app-store-operation.lock"
+OPERATION_LOCK_CREATED=0
 
 require_tool() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -210,9 +221,14 @@ installer_identity_exists() {
 }
 
 cleanup() {
+  local status=$?
   if [[ -n "$TEMP_DIR" ]]; then
     rm -rf "$TEMP_DIR"
   fi
+  if [[ "$OPERATION_LOCK_CREATED" -eq 1 ]]; then
+    rm -rf "$OPERATION_LOCK"
+  fi
+  return "$status"
 }
 
 prepare_distribution_signing() {
@@ -351,6 +367,80 @@ preserve_symbols() {
   } > "$SYMBOL_MANIFEST"
 }
 
+write_release_manifest() {
+  local bundle_binary="$APP_PATH/Contents/MacOS/$EXECUTABLE_NAME"
+  local bundled_privacy="$APP_PATH/Contents/Resources/PrivacyInfo.xcprivacy"
+  local bundled_license="$APP_PATH/Contents/Resources/LICENSE"
+  local package_name=""
+  local package_sha256=""
+
+  if [[ "$PKG_CREATED" -eq 1 ]]; then
+    package_name="$(basename "$PKG_PATH")"
+    package_sha256="$(shasum -a 256 "$PKG_PATH" | awk '{print $1}')"
+  fi
+
+  python3 - "$MANIFEST_PATH" "$APP_NAME" "$EXECUTABLE_NAME" "$BUNDLE_IDENTIFIER" \
+    "$MARKETING_VERSION" "$BUILD_NUMBER" "$ARCHITECTURE" "$SOURCE_COMMIT" "$SOURCE_STATE" \
+    "$([[ "$SKIP_SIGNING" -eq 1 ]] && printf 'ad-hoc local validation' || printf '%s' "$SIGNING_IDENTITY")" \
+    "$(shasum -a 256 "$bundle_binary" | awk '{print $1}')" \
+    "$(shasum -a 256 "$bundled_privacy" | awk '{print $1}')" \
+    "$(shasum -a 256 "$bundled_license" | awk '{print $1}')" \
+    "$(shasum -a 256 "$SYMBOL_MANIFEST" | awk '{print $1}')" \
+    "$package_name" "$package_sha256" <<'PY'
+import json
+import sys
+
+(
+    path, app_name, executable, bundle_identifier, version, build, architecture,
+    source_commit, source_state, signing_mode, executable_sha256, privacy_sha256,
+    license_sha256, symbols_sha256, package_name, package_sha256,
+) = sys.argv[1:]
+data = {
+    "schemaVersion": 1,
+    "product": {
+        "name": app_name,
+        "executable": executable,
+        "bundleIdentifier": bundle_identifier,
+        "marketingVersion": version,
+        "buildNumber": build,
+        "architecture": architecture,
+    },
+    "sourceCommit": source_commit,
+    "sourceState": source_state,
+    "signingMode": signing_mode,
+    "artifacts": {
+        "appExecutableSHA256": executable_sha256,
+        "privacyManifestSHA256": privacy_sha256,
+        "licenseSHA256": license_sha256,
+        "symbolManifestSHA256": symbols_sha256,
+        "installerPackage": package_name or None,
+        "installerPackageSHA256": package_sha256 or None,
+    },
+}
+with open(path, "w", encoding="utf-8") as handle:
+    json.dump(data, handle, indent=2, sort_keys=True)
+    handle.write("\n")
+PY
+}
+
+write_release_checksums() {
+  local assets=(
+    "$APP_NAME.app/Contents/MacOS/$EXECUTABLE_NAME"
+    "$APP_NAME.app/Contents/Resources/PrivacyInfo.xcprivacy"
+    "$APP_NAME.app/Contents/Resources/LICENSE"
+    "symbols/$MARKETING_VERSION-$BUILD_NUMBER-$ARCHITECTURE/manifest.txt"
+    "$(basename "$MANIFEST_PATH")"
+  )
+  if [[ "$PKG_CREATED" -eq 1 ]]; then
+    assets+=("$(basename "$PKG_PATH")")
+  fi
+  (
+    cd "$DIST_DIR"
+    shasum -a 256 "${assets[@]}" > "$(basename "$CHECKSUM_PATH")"
+    shasum -a 256 -c "$(basename "$CHECKSUM_PATH")" >/dev/null
+  )
+}
+
 require_tool swift
 require_tool sips
 require_tool iconutil
@@ -361,6 +451,7 @@ require_tool lipo
 require_tool dwarfdump
 require_tool shasum
 require_tool xcrun
+require_tool python3
 
 if [[ -n "$(git -C "$ROOT_DIR" status --porcelain --untracked-files=all)" ]]; then
   SOURCE_STATE="dirty"
@@ -390,7 +481,22 @@ fi
 guard_release_output_path "$ROOT_DIR" "$DIST_DIR"
 mkdir -p "$DIST_DIR"
 guard_release_output_path "$ROOT_DIR" "$DIST_DIR"
+if ! mkdir "$OPERATION_LOCK" 2>/dev/null; then
+  echo "Another App Store packaging operation is already running for $DIST_DIR." >&2
+  exit 7
+fi
+OPERATION_LOCK_CREATED=1
+printf '%s\n' "$$" > "$OPERATION_LOCK/pid"
+trap cleanup EXIT
 rm -rf "$APP_PATH" "$PKG_PATH" "$SUMMARY_PATH" "$SYMBOLS_DIR"
+rm -rf "$ICONSET_DIR"
+rm -f \
+  "$MANIFEST_PATH" \
+  "$CHECKSUM_PATH" \
+  "$DIST_DIR/codesign-entitlements.plist" \
+  "$DIST_DIR/codesign-details.txt" \
+  "$DIST_DIR/spctl-app.txt" \
+  "$DIST_DIR/pkg-signature.txt"
 
 echo "==> Building SwiftPM release product"
 swift build -c release --arch "$ARCHITECTURE" --package-path "$PACKAGE_DIR" --product "$EXECUTABLE_NAME"
@@ -402,7 +508,9 @@ chmod 755 "$APP_PATH/Contents/MacOS/$EXECUTABLE_NAME"
 validate_binary_minimum_system_version "$APP_PATH/Contents/MacOS/$EXECUTABLE_NAME"
 render_info_plist
 make_icon
+rm -rf "$ICONSET_DIR"
 cp "$PRIVACY_MANIFEST" "$APP_PATH/Contents/Resources/PrivacyInfo.xcprivacy"
+cp "$ROOT_DIR/LICENSE" "$APP_PATH/Contents/Resources/LICENSE"
 
 if [[ "$SKIP_SIGNING" -eq 0 ]]; then
   cp "$PROVISIONING_PROFILE" "$APP_PATH/Contents/embedded.provisionprofile"
@@ -431,6 +539,10 @@ if [[ "$SKIP_SIGNING" -eq 0 ]]; then
   PKG_CREATED=1
 fi
 
+echo "==> Writing source-bound release manifest and checksums"
+write_release_manifest
+write_release_checksums
+
 cat > "$SUMMARY_PATH" <<SUMMARY
 App Store packaging summary
 ===========================
@@ -448,6 +560,8 @@ Provisioning profile: ${PROVISIONING_PROFILE:-not embedded}
 Entitlements: $ENTITLEMENTS
 Symbols: $SYMBOLS_DIR
 Symbol manifest: $SYMBOL_MANIFEST
+Release manifest: $MANIFEST_PATH
+Checksums: $CHECKSUM_PATH
 
 Next steps:
 - Install Mac App Store distribution and installer identities if missing.

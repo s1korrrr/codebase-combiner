@@ -88,6 +88,7 @@ jobs:
           LOCAL_DEVELOPER_ID_CERTIFICATE_SHA256: ${{ vars.LOCAL_DEVELOPER_ID_CERTIFICATE_SHA256 }}
         run: |
           set -euo pipefail
+          umask 077
           [[ "$CI_DEVELOPER_ID_CERTIFICATE_SHA256" =~ ^[A-Fa-f0-9]{64}$ ]]
           [[ "$LOCAL_DEVELOPER_ID_CERTIFICATE_SHA256" =~ ^[A-Fa-f0-9]{64}$ ]]
           test "${CI_DEVELOPER_ID_CERTIFICATE_SHA256^^}" != "${LOCAL_DEVELOPER_ID_CERTIFICATE_SHA256^^}"
@@ -96,6 +97,7 @@ jobs:
           certificate="$RUNNER_TEMP/developer-id.p12"
           public_certificate="$RUNNER_TEMP/developer-id.pem"
           printf '%s' "$DEVELOPER_ID_P12_BASE64" | base64 --decode > "$certificate"
+          chmod 600 "$certificate"
           security create-keychain -p "$keychain_secret" "$keychain"
           security set-keychain-settings -lut 21600 "$keychain"
           security unlock-keychain -p "$keychain_secret" "$keychain"

@@ -41,6 +41,22 @@ grep -F 'concurrency:' .github/workflows/ci.yml >/dev/null
 grep -F 'npm audit signatures' .github/workflows/ci.yml >/dev/null
 grep -F 'Packaging/DeveloperID/tests/run_tests.sh' .github/workflows/ci.yml >/dev/null
 
+for privacy_manifest in Packaging/AppStore/PrivacyInfo.xcprivacy Packaging/DeveloperID/PrivacyInfo.xcprivacy; do
+  plutil -lint "$privacy_manifest" >/dev/null
+  grep -F 'NSPrivacyAccessedAPICategoryFileTimestamp' "$privacy_manifest" >/dev/null
+  grep -F '<string>3B52.1</string>' "$privacy_manifest" >/dev/null
+  grep -F '<string>C617.1</string>' "$privacy_manifest" >/dev/null
+done
+
+grep -F 'cp "$ROOT_DIR/LICENSE" "$APP_PATH/Contents/Resources/LICENSE"' Packaging/AppStore/build_app_store_package.sh >/dev/null
+grep -F 'release-manifest.json' Packaging/AppStore/build_app_store_package.sh >/dev/null
+grep -F 'SHA256SUMS' Packaging/AppStore/build_app_store_package.sh >/dev/null
+grep -F '.app-store-operation.lock' Packaging/AppStore/build_app_store_package.sh >/dev/null
+grep -F '"$DIST_DIR/pkg-signature.txt"' Packaging/AppStore/build_app_store_package.sh >/dev/null
+grep -F '"$DIST_DIR/codesign-entitlements.plist"' Packaging/AppStore/build_app_store_package.sh >/dev/null
+grep -F 'umask 077' .github/workflows/release.yml >/dev/null
+grep -F 'chmod 600 "$certificate"' .github/workflows/release.yml >/dev/null
+
 grep -F 'environment: release' .github/workflows/release.yml >/dev/null
 grep -F "vars.CI_SIGNING_PROVISIONED == 'true'" .github/workflows/release.yml >/dev/null
 grep -F 'CI_DEVELOPER_ID_CERTIFICATE_SHA256' .github/workflows/release.yml >/dev/null
