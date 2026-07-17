@@ -12,7 +12,7 @@ This folder contains the Mac App Store packaging path for the SwiftPM macOS app.
 - Architecture: Apple silicon (`arm64`). Intel Macs are not included in this release artifact.
 - Category: `public.app-category.developer-tools`
 - Entitlements: App Sandbox plus user-selected file read/write access.
-- Privacy manifest: declares no tracking, no collected data, and UserDefaults access for app settings.
+- Privacy manifest: declares no tracking or collected data, UserDefaults access for app settings, and file-timestamp access for user-selected files and app-container metadata.
 
 ## Local validation
 
@@ -27,6 +27,8 @@ Output:
 - `dist/app-store/Codebase Combiner.app`
 - `dist/app-store/CodebaseCombiner-AppStore-summary.txt`
 - `dist/app-store/symbols/0.1.0-1-arm64/` with a UUID-checked dSYM and SHA-256 manifest
+- `dist/app-store/release-manifest.json` with source, product, signing-mode, and artifact identities
+- `dist/app-store/SHA256SUMS` covering the executable, privacy manifest, bundled license, symbols manifest, release manifest, and signed installer when present
 
 ## App Store signing
 

@@ -9,7 +9,10 @@ APP_BUNDLE="$ROOT_DIR/dist/app-store/$APP_NAME.app"
 APP_EXECUTABLE="$APP_BUNDLE/Contents/MacOS/CodebaseExplorerApp"
 E2E_APP_NAME="Codebase Combiner E2E"
 E2E_BUNDLE_ID="com.s1korrrr.codebasecombiner.e2ehost"
-E2E_APP_BUNDLE="$ROOT_DIR/dist/app-store/$E2E_APP_NAME.app"
+E2E_DIST_DIR="$ROOT_DIR/dist/app-store-e2e"
+E2E_APP_BUNDLE="$E2E_DIST_DIR/$E2E_APP_NAME.app"
+LEGACY_E2E_APP_BUNDLE="$ROOT_DIR/dist/app-store/$E2E_APP_NAME.app"
+LEGACY_E2E_SUMMARY="$ROOT_DIR/dist/app-store/CodebaseCombinerE2E-AppStore-summary.txt"
 E2E_EXECUTABLE="$E2E_APP_BUNDLE/Contents/MacOS/CodebaseExplorerApp"
 E2E_CONTAINER="$HOME/Library/Containers/$E2E_BUNDLE_ID"
 E2E_PREFERENCES="$HOME/Library/Preferences/$E2E_BUNDLE_ID.plist"
@@ -18,8 +21,10 @@ E2E_FIXTURE_SOURCE="$ROOT_DIR/script/fixtures/e2e-workspace"
 E2E_FIXTURE="/private/tmp/CodebaseCombinerE2EFixture"
 E2E_EXPORT="/private/tmp/CodebaseCombinerE2EExport"
 E2E_PID_FILE="$E2E_RUNTIME_DIR/app.pid"
+E2E_SESSION_LOCK="/private/tmp/CodebaseCombinerE2ESession.lock"
 OWNED_PID=""
 OWNED_EXECUTABLE=""
+E2E_SESSION_LOCK_CREATED=0
 
 cd "$ROOT_DIR"
 
@@ -97,7 +102,31 @@ cleanup_owned_process() {
   if [[ "$MODE" == "--e2e" || "$MODE" == "e2e" ]]; then
     rm -f "$E2E_PID_FILE"
   fi
+  release_e2e_session_lock
   exit "$status"
+}
+
+cleanup_e2e_session() {
+  local status=$?
+  trap - EXIT INT TERM
+  release_e2e_session_lock
+  exit "$status"
+}
+
+acquire_e2e_session_lock() {
+  if ! mkdir "$E2E_SESSION_LOCK" 2>/dev/null; then
+    echo "Another E2E build, run, or cleanup operation is already active." >&2
+    return 1
+  fi
+  E2E_SESSION_LOCK_CREATED=1
+  printf '%s\n' "$$" > "$E2E_SESSION_LOCK/pid"
+}
+
+release_e2e_session_lock() {
+  if [[ "$E2E_SESSION_LOCK_CREATED" -eq 1 ]]; then
+    rm -rf "$E2E_SESSION_LOCK"
+    E2E_SESSION_LOCK_CREATED=0
+  fi
 }
 
 launch_owned_process() {
@@ -125,17 +154,22 @@ prepare_e2e_fixture() {
   cp -R "$E2E_FIXTURE_SOURCE/." "$E2E_FIXTURE/"
 }
 
-known_e2e_process_is_running() {
-  [[ -f "$E2E_PID_FILE" ]] || return 1
-  local pid
-  pid="$(cat "$E2E_PID_FILE")"
-  [[ "$pid" =~ ^[0-9]+$ ]] || return 1
-  [[ "$(process_command "$pid")" == "$E2E_EXECUTABLE" ]]
+running_e2e_processes() {
+  local pid command
+  while read -r pid command; do
+    [[ "$pid" =~ ^[0-9]+$ ]] || continue
+    if [[ "$command" == *"/$E2E_APP_NAME.app/Contents/MacOS/CodebaseExplorerApp" ]]; then
+      printf '%s\t%s\n' "$pid" "$command"
+    fi
+  done < <(ps -axo pid=,command=)
 }
 
 reset_e2e_state() {
-  if known_e2e_process_is_running; then
-    echo "Refusing to reset E2E state while owned PID $(cat "$E2E_PID_FILE") is running." >&2
+  local running_processes
+  running_processes="$(running_e2e_processes)"
+  if [[ -n "$running_processes" ]]; then
+    echo "Refusing to reset E2E state while another E2E host is running." >&2
+    printf '%s\n' "$running_processes" >&2
     return 1
   fi
 
@@ -148,11 +182,15 @@ reset_e2e_state() {
 
 clean_e2e_artifacts() {
   reset_e2e_state
+  rm -rf "$E2E_DIST_DIR"
+  rm -rf "$LEGACY_E2E_APP_BUNDLE"
+  rm -f "$LEGACY_E2E_SUMMARY"
   rm -rf "$E2E_RUNTIME_DIR" "$E2E_FIXTURE" "$E2E_EXPORT"
 }
 
 build_sandboxed_e2e_app() {
   APPSTORE_APP_NAME="$E2E_APP_NAME" \
+    APPSTORE_OUTPUT_NAME=app-store-e2e \
     Packaging/AppStore/build_app_store_package.sh \
       --skip-signing \
       --bundle-id "$E2E_BUNDLE_ID" >"$BUILD_LOG"
@@ -193,8 +231,11 @@ case "$MODE" in
     ;;
   --e2e|e2e)
     trap cleanup_owned_process EXIT INT TERM
-    if known_e2e_process_is_running; then
-      echo "An owned E2E host is already running as PID $(cat "$E2E_PID_FILE")." >&2
+    acquire_e2e_session_lock || exit 7
+    running_processes="$(running_e2e_processes)"
+    if [[ -n "$running_processes" ]]; then
+      echo "An E2E host is already running:" >&2
+      printf '%s\n' "$running_processes" >&2
       exit 1
     fi
     mkdir -p "$E2E_RUNTIME_DIR"
@@ -222,6 +263,8 @@ case "$MODE" in
     rm -f "$E2E_PID_FILE"
     ;;
   --clean-e2e-state|clean-e2e-state)
+    trap cleanup_e2e_session EXIT INT TERM
+    acquire_e2e_session_lock || exit 7
     clean_e2e_artifacts
     echo "Removed E2E app-owned container data, preferences, runtime files, fixture, and export."
     ;;
