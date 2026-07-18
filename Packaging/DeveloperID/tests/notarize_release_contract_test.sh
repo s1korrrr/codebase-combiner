@@ -293,6 +293,9 @@ grep -F 'spctl --assess --type execute' "$LOG" >/dev/null
 grep -F 'codesign --verify --deep --strict' "$LOG" >/dev/null
 test -f "$TMP_DIR/notarization/submission-123-log.json"
 test -f "$TMP_DIR/SHA256SUMS"
+test -f "$TMP_DIR/notarization-summary.json"
+test -f "$TMP_DIR/notarization-submission.json"
+test -f "$TMP_DIR/notarization-log.json"
 python3 - "$MANIFEST" <<'PY'
 import json
 import sys
@@ -311,11 +314,15 @@ grep -F 'Codebase-Combiner-0.1.0-arm64.dmg' "$TMP_DIR/SHA256SUMS" >/dev/null
 grep -F 'Codebase-Combiner-0.1.0-arm64.cdx.json' "$TMP_DIR/SHA256SUMS" >/dev/null
 grep -F 'Codebase-Combiner-0.1.0-arm64-symbols.zip' "$TMP_DIR/SHA256SUMS" >/dev/null
 grep -F 'release-manifest.json' "$TMP_DIR/SHA256SUMS" >/dev/null
-grep -F 'notarization/summary.json' "$TMP_DIR/SHA256SUMS" >/dev/null
-grep -F 'notarization/submission.json' "$TMP_DIR/SHA256SUMS" >/dev/null
-grep -F 'notarization/submission-123-log.json' "$TMP_DIR/SHA256SUMS" >/dev/null
+grep -F 'notarization-summary.json' "$TMP_DIR/SHA256SUMS" >/dev/null
+grep -F 'notarization-submission.json' "$TMP_DIR/SHA256SUMS" >/dev/null
+grep -F 'notarization-log.json' "$TMP_DIR/SHA256SUMS" >/dev/null
+if grep -F 'notarization/' "$TMP_DIR/SHA256SUMS"; then
+  echo "Published checksums must use the flat GitHub asset layout." >&2
+  exit 1
+fi
 
-for protected_asset in "$SBOM" "$SYMBOLS" "$MANIFEST" "$TMP_DIR/notarization/summary.json" "$TMP_DIR/notarization/submission-123-log.json"; do
+for protected_asset in "$SBOM" "$SYMBOLS" "$MANIFEST" "$TMP_DIR/notarization-summary.json" "$TMP_DIR/notarization-log.json"; do
   cp "$protected_asset" "$protected_asset.backup"
   printf 'tampered\n' >> "$protected_asset"
   if (cd "$TMP_DIR" && shasum -a 256 -c SHA256SUMS >/dev/null 2>&1); then
