@@ -29,7 +29,7 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>Copyright © @COPYRIGHT_YEAR@ Rafal Sikora. Licensed under MIT.</string>
+	<string>Copyright © @COPYRIGHT_YEAR@ Rafal Sikora. Licensed under the MIT License.</string>
 	<key>NSSupportsAutomaticGraphicsSwitching</key>
 	<true/>
 </dict>

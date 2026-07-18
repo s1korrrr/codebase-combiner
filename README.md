@@ -31,9 +31,15 @@ See `INSTALL.md` for full setup and run instructions.
 
 ### Download the macOS app
 
-When an official macOS build is available, it will be distributed outside the Mac App Store through [GitHub Releases](https://github.com/s1korrrr/codebase-combiner/releases) as a Developer ID-signed, Apple-notarized DMG. The planned 0.1.0 artifact is Apple-silicon-only and declares macOS 13 or newer; the release checklist records the required macOS 13 runtime proof.
+Official macOS builds are distributed outside the Mac App Store through [GitHub Releases](https://github.com/s1korrrr/codebase-combiner/releases) as Developer ID-signed, Apple-notarized DMGs. Version 0.1.0, once published, is Apple-silicon-only (`arm64`) and requires macOS 13 or later; Intel and universal builds are not provided.
 
-Download the DMG and its `SHA256SUMS` file from the same release, verify the hash, open the DMG, and drag **Codebase Combiner** into `/Applications`. Do not use Gatekeeper-bypass commands; an official artifact must open normally.
+Download all assets from the release into one directory and verify them before opening the DMG:
+
+```sh
+shasum -a 256 -c SHA256SUMS
+```
+
+Open the DMG and drag **Codebase Combiner** into `/Applications`. Do not use Gatekeeper-bypass commands; the official artifact must open normally.
 
 Quick start (VS Code extension):
 

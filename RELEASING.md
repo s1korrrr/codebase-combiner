@@ -87,6 +87,27 @@ After the workflow creates the draft and before publishing it:
 
 ## GitHub publication
 
-CI signing is `blocked:external` until the owner deliberately provisions a separate CI signing credential in the protected `release` environment; the local login-Keychain identity must never be exported for CI. Once that boundary is satisfied, a verified signed annotated `macos-v*` tag at the current `main` commit triggers `.github/workflows/release.yml`, which creates a draft release only. Release notes must exist at `docs/release/<version>/RELEASE_NOTES.md`. Review the notarization log, artifact hashes, SBOM, matched symbols, provenance, source commit, and clean-download evidence before publishing the draft.
+Create `macos-v0.1.0` as a signed annotated tag at the exact current `main`
+commit. Verify the signature locally and require GitHub's tag API to report
+`verification.verified=true` before relying on the tag.
+
+The hosted path requires a separate CI signing credential in a protected
+`release` environment; the local login-Keychain identity must never be exported
+for CI. A verified signed annotated `macos-v*` tag triggers
+`.github/workflows/release.yml`. An unprovisioned tag fails explicitly. A
+provisioned run signs, notarizes, verifies, attests, and creates a draft release.
+
+An owner-operated local release may use the installed login-Keychain identity
+directly when CI signing is unavailable. Build from a clean checkout of the
+verified tag, pass `DEVELOPER_ID_SOURCE_TAG=macos-v0.1.0`, notarize with the
+stored Keychain profile, and upload only the final DMG, `SHA256SUMS`, SBOM,
+symbols, generated manifest, and flat notarization evidence files to a draft
+GitHub Release. Never upload an ad-hoc artifact.
+
+Release notes must exist at `docs/release/<version>/RELEASE_NOTES.md`. Review
+the notarization log, artifact hashes, SBOM, matched symbols, source commit, and
+clean-download evidence before publishing the draft. Publish 0.1.0 only after
+the downloaded assets pass `shasum -a 256 -c SHA256SUMS`, Gatekeeper, launch,
+and representative workflow checks.
 
 If a release is defective, leave its tag immutable, mark the release as withdrawn, remove the affected binary from the recommended-download path, publish a security notice when appropriate, and issue a new patch version. Never replace an existing tagged artifact silently.

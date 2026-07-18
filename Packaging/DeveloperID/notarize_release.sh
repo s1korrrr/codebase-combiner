@@ -95,6 +95,9 @@ SUBMIT_JSON="$NOTARY_DIR/submission.json"
 SUMMARY_JSON="$NOTARY_DIR/summary.json"
 FINAL_CHECKSUMS="$DIST_DIR/SHA256SUMS"
 MANIFEST_PATH="$DIST_DIR/release-manifest.json"
+PUBLIC_SUMMARY="$DIST_DIR/notarization-summary.json"
+PUBLIC_SUBMISSION="$DIST_DIR/notarization-submission.json"
+PUBLIC_LOG="$DIST_DIR/notarization-log.json"
 OPERATION_LOCK="$DIST_DIR/.release-operation.lock"
 [[ -f "$MANIFEST_PATH" ]] || { echo "Release manifest not found: $MANIFEST_PATH" >&2; exit 2; }
 artifact_names="$(python3 - "$MANIFEST_PATH" <<'PY'
@@ -320,15 +323,18 @@ with open(path, "w", encoding="utf-8") as handle:
 PY
 
 (
+  cp "$SUMMARY_JSON" "$PUBLIC_SUMMARY"
+  cp "$SUBMIT_JSON" "$PUBLIC_SUBMISSION"
+  cp "$NOTARY_LOG" "$PUBLIC_LOG"
   cd "$DIST_DIR"
   shasum -a 256 \
     "$(basename "$DMG_PATH")" \
     "$(basename "$SBOM_PATH")" \
     "$(basename "$SYMBOLS_PATH")" \
     "$(basename "$MANIFEST_PATH")" \
-    "notarization/$(basename "$SUMMARY_JSON")" \
-    "notarization/$(basename "$SUBMIT_JSON")" \
-    "notarization/$(basename "$NOTARY_LOG")" > "$(basename "$FINAL_CHECKSUMS")"
+    "$(basename "$PUBLIC_SUMMARY")" \
+    "$(basename "$PUBLIC_SUBMISSION")" \
+    "$(basename "$PUBLIC_LOG")" > "$(basename "$FINAL_CHECKSUMS")"
   shasum -a 256 -c "$(basename "$FINAL_CHECKSUMS")" >/dev/null
 )
 

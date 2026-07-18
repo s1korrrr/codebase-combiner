@@ -33,6 +33,11 @@ jobs:
           set -euo pipefail
           version="${GITHUB_REF_NAME#macos-v}"
           [[ "$version" =~ ^[0-9]+([.][0-9]+){1,2}$ ]]
+          notes="docs/release/$version/RELEASE_NOTES.md"
+          test -s "$notes" || {
+            echo "Release notes are missing or empty: $notes" >&2
+            exit 1
+          }
 
           ref_json="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$GITHUB_REF_NAME")"
           test "$(jq -r '.object.type' <<< "$ref_json")" = tag
@@ -61,7 +66,6 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
   sign-notarize:
-    if: ${{ vars.CI_SIGNING_PROVISIONED == 'true' }}
     needs: verify-source
     runs-on: macos-15
     timeout-minutes: 45
@@ -74,11 +78,23 @@ jobs:
       SIGNING_IDENTITY: 'Developer ID Application: Rafal Sikora (2NY8A789TN)'
       NOTARY_PROFILE: codebase-combiner-notary
     steps:
+      - name: Require explicit release signing provisioning
+        env:
+          CI_SIGNING_PROVISIONED: ${{ vars.CI_SIGNING_PROVISIONED }}
+        run: |
+          test "$CI_SIGNING_PROVISIONED" = true || {
+            echo "Release signing is not provisioned. Configure the protected release environment before tagging." >&2
+            exit 3
+          }
+
       - name: Checkout verified source commit
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ needs.verify-source.outputs.commit }}
           fetch-depth: 0
+
+      - name: Initialize ephemeral release paths
+        run: echo "RELEASE_KEYCHAIN=$RUNNER_TEMP/release.keychain-db" >> "$GITHUB_ENV"
 
       - name: Import Developer ID identity
         env:
@@ -92,25 +108,24 @@ jobs:
           [[ "$CI_DEVELOPER_ID_CERTIFICATE_SHA256" =~ ^[A-Fa-f0-9]{64}$ ]]
           [[ "$LOCAL_DEVELOPER_ID_CERTIFICATE_SHA256" =~ ^[A-Fa-f0-9]{64}$ ]]
           test "${CI_DEVELOPER_ID_CERTIFICATE_SHA256^^}" != "${LOCAL_DEVELOPER_ID_CERTIFICATE_SHA256^^}"
-          keychain="$RUNNER_TEMP/release.keychain-db"
           keychain_secret="$(openssl rand -hex 32)"
           certificate="$RUNNER_TEMP/developer-id.p12"
           public_certificate="$RUNNER_TEMP/developer-id.pem"
           printf '%s' "$DEVELOPER_ID_P12_BASE64" | base64 --decode > "$certificate"
           chmod 600 "$certificate"
-          security create-keychain -p "$keychain_secret" "$keychain"
-          security set-keychain-settings -lut 21600 "$keychain"
-          security unlock-keychain -p "$keychain_secret" "$keychain"
-          security import "$certificate" -k "$keychain" -P "$DEVELOPER_ID_P12_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_secret" "$keychain"
-          security list-keychains -d user -s "$keychain"
-          security find-identity -p codesigning -v "$keychain" | grep -F "$SIGNING_IDENTITY"
-          security find-certificate -c "$SIGNING_IDENTITY" -p "$keychain" > "$public_certificate"
+          security create-keychain -p "$keychain_secret" "$RELEASE_KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$RELEASE_KEYCHAIN"
+          security unlock-keychain -p "$keychain_secret" "$RELEASE_KEYCHAIN"
+          security import "$certificate" -k "$RELEASE_KEYCHAIN" -P "$DEVELOPER_ID_P12_PASSWORD" -T /usr/bin/codesign
+          rm -f "$certificate"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_secret" "$RELEASE_KEYCHAIN"
+          security list-keychains -d user -s "$RELEASE_KEYCHAIN"
+          security find-identity -p codesigning -v "$RELEASE_KEYCHAIN" | grep -F "$SIGNING_IDENTITY"
+          security find-certificate -c "$SIGNING_IDENTITY" -p "$RELEASE_KEYCHAIN" > "$public_certificate"
           actual_fingerprint="$(openssl x509 -in "$public_certificate" -noout -fingerprint -sha256 | sed 's/^sha256 Fingerprint=//; s/^SHA256 Fingerprint=//; s/://g' | tr '[:lower:]' '[:upper:]')"
           test "$actual_fingerprint" = "${CI_DEVELOPER_ID_CERTIFICATE_SHA256^^}"
           test "$actual_fingerprint" != "${LOCAL_DEVELOPER_ID_CERTIFICATE_SHA256^^}"
           rm -f "$public_certificate"
-          echo "RELEASE_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
 
       - name: Store notary credentials in the ephemeral Keychain
         env:
@@ -119,6 +134,7 @@ jobs:
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
         run: |
           set -euo pipefail
+          umask 077
           key="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
           printf '%s' "$APPLE_API_KEY_P8_BASE64" | base64 --decode > "$key"
           chmod 600 "$key"
@@ -147,6 +163,9 @@ jobs:
             --keychain "$RELEASE_KEYCHAIN" \
             --timeout 30m
 
+      - name: Remove signing credentials after notarization
+        run: security delete-keychain "$RELEASE_KEYCHAIN"
+
       - name: Attest every published release subject
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
         with:
@@ -154,10 +173,11 @@ jobs:
             dist/developer-id/Codebase-Combiner-${{ needs.verify-source.outputs.version }}-arm64.dmg
             dist/developer-id/Codebase-Combiner-${{ needs.verify-source.outputs.version }}-arm64.cdx.json
             dist/developer-id/Codebase-Combiner-${{ needs.verify-source.outputs.version }}-arm64-symbols.zip
+            dist/developer-id/SHA256SUMS
             dist/developer-id/release-manifest.json
-            dist/developer-id/notarization/summary.json
-            dist/developer-id/notarization/submission.json
-            dist/developer-id/notarization/*-log.json
+            dist/developer-id/notarization-summary.json
+            dist/developer-id/notarization-submission.json
+            dist/developer-id/notarization-log.json
 
       - name: Transfer verified release assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -171,9 +191,9 @@ jobs:
             dist/developer-id/Codebase-Combiner-${{ needs.verify-source.outputs.version }}-arm64-symbols.zip
             dist/developer-id/SHA256SUMS
             dist/developer-id/release-manifest.json
-            dist/developer-id/notarization/summary.json
-            dist/developer-id/notarization/submission.json
-            dist/developer-id/notarization/*-log.json
+            dist/developer-id/notarization-summary.json
+            dist/developer-id/notarization-submission.json
+            dist/developer-id/notarization-log.json
 
       - name: Remove ephemeral signing material
         if: always()
@@ -219,6 +239,6 @@ jobs:
             "release-assets/Codebase-Combiner-$version-arm64.cdx.json" \
             "release-assets/Codebase-Combiner-$version-arm64-symbols.zip" \
             "release-assets/release-manifest.json" \
-            "release-assets/notarization/summary.json" \
-            "release-assets/notarization/submission.json" \
-            "release-assets/notarization/"*-log.json
+            "release-assets/notarization-summary.json" \
+            "release-assets/notarization-submission.json" \
+            "release-assets/notarization-log.json"

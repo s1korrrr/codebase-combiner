@@ -32,7 +32,7 @@ grep -E 'balanced-match[[:space:]]*\|[[:space:]]*1[.]0[.]2[[:space:]]*\|[[:space
 grep -F 'macos-v0.1.0' RELEASING.md >/dev/null
 grep -F 'Developer ID Application' RELEASING.md >/dev/null
 grep -F 'clean standard macOS account' RELEASING.md >/dev/null
-grep -F 'local login-Keychain identity must never be exported for CI' RELEASING.md >/dev/null
+grep -F 'must never be exported' RELEASING.md >/dev/null
 
 grep -F 'permissions:' .github/workflows/ci.yml >/dev/null
 grep -F 'contents: read' .github/workflows/ci.yml >/dev/null
@@ -56,9 +56,32 @@ grep -F '"$DIST_DIR/pkg-signature.txt"' Packaging/AppStore/build_app_store_packa
 grep -F '"$DIST_DIR/codesign-entitlements.plist"' Packaging/AppStore/build_app_store_package.sh >/dev/null
 grep -F 'umask 077' .github/workflows/release.yml >/dev/null
 grep -F 'chmod 600 "$certificate"' .github/workflows/release.yml >/dev/null
+grep -F 'rm -f "$certificate"' .github/workflows/release.yml >/dev/null
+test "$(grep -c 'umask 077' .github/workflows/release.yml)" -ge 2
+grep -F 'RELEASE_KEYCHAIN=$RUNNER_TEMP/release.keychain-db' .github/workflows/release.yml >/dev/null
+python3 - <<'PY'
+from pathlib import Path
+
+workflow = Path('.github/workflows/release.yml').read_text(encoding='utf-8')
+required_order = [
+    'security import "$certificate"',
+    'rm -f "$certificate"',
+    'Packaging/DeveloperID/notarize_release.sh',
+    '- name: Remove signing credentials after notarization',
+    'run: security delete-keychain "$RELEASE_KEYCHAIN"',
+    '- name: Attest every published release subject',
+]
+positions = [workflow.index(marker) for marker in required_order]
+if positions != sorted(positions):
+    raise SystemExit('Release credentials are not removed at the earliest safe point.')
+PY
 
 grep -F 'environment: release' .github/workflows/release.yml >/dev/null
-grep -F "vars.CI_SIGNING_PROVISIONED == 'true'" .github/workflows/release.yml >/dev/null
+grep -F 'Release signing is not provisioned' .github/workflows/release.yml >/dev/null
+if grep -F "if: \${{ vars.CI_SIGNING_PROVISIONED == 'true' }}" .github/workflows/release.yml; then
+  echo "A release tag must fail explicitly when signing is not provisioned." >&2
+  exit 1
+fi
 grep -F 'CI_DEVELOPER_ID_CERTIFICATE_SHA256' .github/workflows/release.yml >/dev/null
 grep -F 'LOCAL_DEVELOPER_ID_CERTIFICATE_SHA256' .github/workflows/release.yml >/dev/null
 grep -F 'draft' .github/workflows/release.yml >/dev/null
@@ -69,8 +92,10 @@ grep -F 'verification.verified' .github/workflows/release.yml >/dev/null
 grep -F 'origin/main' .github/workflows/release.yml >/dev/null
 grep -F 'check-runs' .github/workflows/release.yml >/dev/null
 grep -F 'symbols.zip' .github/workflows/release.yml >/dev/null
-grep -F 'dist/developer-id/notarization/submission.json' .github/workflows/release.yml >/dev/null
-grep -F 'release-assets/notarization/submission.json' .github/workflows/release.yml >/dev/null
+grep -F 'docs/release/$version/RELEASE_NOTES.md' .github/workflows/release.yml >/dev/null
+grep -F 'dist/developer-id/SHA256SUMS' .github/workflows/release.yml >/dev/null
+grep -F 'dist/developer-id/notarization-submission.json' .github/workflows/release.yml >/dev/null
+grep -F 'release-assets/notarization-submission.json' .github/workflows/release.yml >/dev/null
 grep -F 'DEVELOPER_ID_SOURCE_TAG' .github/workflows/release.yml >/dev/null
 if grep -F 'pull_request:' .github/workflows/release.yml; then
   echo "Release signing must never run on pull requests." >&2
