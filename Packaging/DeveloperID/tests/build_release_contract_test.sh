@@ -110,6 +110,9 @@ grep -F 'preserve' "$sentinel" >/dev/null
 mkdir -p "$DIST_DIR/notarization"
 printf 'stale\n' > "$DIST_DIR/notarization/summary.json"
 printf 'stale\n' > "$DIST_DIR/SHA256SUMS"
+printf 'stale\n' > "$DIST_DIR/notarization-summary.json"
+printf 'stale\n' > "$DIST_DIR/notarization-submission.json"
+printf 'stale\n' > "$DIST_DIR/notarization-log.json"
 run_build --skip-signing
 
 test -d "$APP"
@@ -121,10 +124,15 @@ test -f "$DIST_DIR/symbols/0.1.0-1-arm64/manifest.txt"
 test ! -e "$APP/Contents/embedded.provisionprofile"
 test ! -e "$DIST_DIR/notarization"
 test ! -e "$DIST_DIR/SHA256SUMS"
+test ! -e "$DIST_DIR/notarization-summary.json"
+test ! -e "$DIST_DIR/notarization-submission.json"
+test ! -e "$DIST_DIR/notarization-log.json"
 cmp -s "$ROOT_DIR/LICENSE" "$APP/Contents/Resources/LICENSE"
 cmp -s "$ROOT_DIR/THIRD_PARTY_NOTICES.md" "$APP/Contents/Resources/THIRD_PARTY_NOTICES.md"
 
 plutil -lint "$APP/Contents/Info.plist" >/dev/null
+test "$(/usr/libexec/PlistBuddy -c 'Print :NSHumanReadableCopyright' "$APP/Contents/Info.plist")" = \
+  'Copyright © 2026 Rafal Sikora. Licensed under the MIT License.'
 plutil -lint "$APP/Contents/Resources/PrivacyInfo.xcprivacy" >/dev/null
 codesign --verify --deep --strict --verbose=2 "$APP"
 codesign --verify --verbose=2 "$DMG"
