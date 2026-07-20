@@ -1,9 +1,11 @@
 # Codebase Combiner
 
 [![CI](https://github.com/rsitech-ai/codebase-combiner/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rsitech-ai/codebase-combiner/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 Codebase Combiner helps you curate files, count tokens, and generate a ready-to-paste prompt from a workspace or folder.
+
+Maintained by [RSI Tech](https://rsitech.ai). Public and confidential project contact: [info@rsitech.ai](mailto:info@rsitech.ai).
 
 This repo ships two deliverables:
 
@@ -136,4 +138,4 @@ See `SECURITY.md`.
 
 ## License
 
-MIT. See `LICENSE`.
+Apache-2.0. Copyright 2026 Rafal Sikora. See `LICENSE` and `NOTICE`.

@@ -5,6 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
 required_files=(
+  LICENSE
+  NOTICE
   RELEASING.md
   THIRD_PARTY_NOTICES.md
   .github/dependabot.yml
@@ -16,8 +18,14 @@ for file in "${required_files[@]}"; do
   [[ -f "$file" ]] || { echo "Missing open-source release file: $file" >&2; exit 1; }
 done
 
-grep -F 'GitHub private vulnerability reporting is not currently enabled' SECURITY.md >/dev/null
-grep -F 'A functioning private intake is not currently available' docs/support.md >/dev/null
+grep -F 'Apache License' LICENSE >/dev/null
+grep -F 'Version 2.0' LICENSE >/dev/null
+grep -F 'Copyright 2026 Rafal Sikora' NOTICE >/dev/null
+grep -F 'RSI Tech' NOTICE >/dev/null
+grep -F 'info@rsitech.ai' SECURITY.md >/dev/null
+grep -F 'info@rsitech.ai' CODE_OF_CONDUCT.md >/dev/null
+grep -F 'info@rsitech.ai' docs/support.md >/dev/null
+grep -F 'RSI Tech' docs/support.md >/dev/null
 grep -F '/security/policy' .github/ISSUE_TEMPLATE/config.yml >/dev/null
 if grep -F 'security/advisories/new' SECURITY.md docs/support.md .github/ISSUE_TEMPLATE/config.yml; then
   echo "Security guidance must not advertise a disabled private-reporting endpoint." >&2
@@ -66,6 +74,9 @@ for privacy_manifest in Packaging/AppStore/PrivacyInfo.xcprivacy Packaging/Devel
 done
 
 grep -F 'cp "$ROOT_DIR/LICENSE" "$APP_PATH/Contents/Resources/LICENSE"' Packaging/AppStore/build_app_store_package.sh >/dev/null
+grep -F 'cp "$ROOT_DIR/NOTICE" "$APP_PATH/Contents/Resources/NOTICE"' Packaging/AppStore/build_app_store_package.sh >/dev/null
+grep -F 'cp "$ROOT_DIR/NOTICE" "$APP_PATH/Contents/Resources/NOTICE"' Packaging/DeveloperID/build_release.sh >/dev/null
+grep -F '"$APP_NAME.app/Contents/Resources/NOTICE"' Packaging/AppStore/build_app_store_package.sh >/dev/null
 grep -F 'release-manifest.json' Packaging/AppStore/build_app_store_package.sh >/dev/null
 grep -F 'SHA256SUMS' Packaging/AppStore/build_app_store_package.sh >/dev/null
 grep -F '.app-store-operation.lock' Packaging/AppStore/build_app_store_package.sh >/dev/null
@@ -118,6 +129,9 @@ if grep -E '\$\{[^}]+\^\^\}' .github/workflows/release.yml; then
   echo "The macOS release workflow uses Bash-4-only uppercase expansion." >&2
   exit 1
 fi
+grep -F '"licenses": [{"license": {"id": "Apache-2.0"}}]' Packaging/DeveloperID/build_release.sh >/dev/null
+grep -F 'Licensed under the Apache License 2.0.' Packaging/DeveloperID/Info.plist.in >/dev/null
+grep -F 'Licensed under the Apache License 2.0.' Packaging/AppStore/Info.plist.in >/dev/null
 grep -F '[[ "${SOURCE_TAG#macos-v}" == "$MARKETING_VERSION" ]]' Packaging/DeveloperID/build_release.sh >/dev/null
 grep -F '[[ "${SOURCE_TAG#macos-v}" == "$MARKETING_VERSION" ]]' Packaging/DeveloperID/verify_release_artifact.sh >/dev/null
 for release_doc in Packaging/DeveloperID/README.md RELEASING.md; do

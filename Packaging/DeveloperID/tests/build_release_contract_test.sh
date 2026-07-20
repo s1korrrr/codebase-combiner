@@ -134,11 +134,12 @@ test ! -e "$DIST_DIR/notarization-summary.json"
 test ! -e "$DIST_DIR/notarization-submission.json"
 test ! -e "$DIST_DIR/notarization-log.json"
 cmp -s "$ROOT_DIR/LICENSE" "$APP/Contents/Resources/LICENSE"
+cmp -s "$ROOT_DIR/NOTICE" "$APP/Contents/Resources/NOTICE"
 cmp -s "$ROOT_DIR/THIRD_PARTY_NOTICES.md" "$APP/Contents/Resources/THIRD_PARTY_NOTICES.md"
 
 plutil -lint "$APP/Contents/Info.plist" >/dev/null
 test "$(/usr/libexec/PlistBuddy -c 'Print :NSHumanReadableCopyright' "$APP/Contents/Info.plist")" = \
-  'Copyright © 2026 Rafal Sikora. Licensed under the MIT License.'
+  'Copyright © 2026 Rafal Sikora. Licensed under the Apache License 2.0.'
 plutil -lint "$APP/Contents/Resources/PrivacyInfo.xcprivacy" >/dev/null
 codesign --verify --deep --strict --verbose=2 "$APP"
 codesign --verify --verbose=2 "$DMG"
@@ -167,6 +168,7 @@ mount_point="$(printf '%s\n' "$attach_output" | awk -F '\t' 'END {print $NF}')"
 test "$(readlink "$mount_point/Applications")" = /Applications
 codesign --verify --deep --strict --verbose=2 "$mount_point/Codebase Combiner.app"
 cmp -s "$ROOT_DIR/LICENSE" "$mount_point/Codebase Combiner.app/Contents/Resources/LICENSE"
+cmp -s "$ROOT_DIR/NOTICE" "$mount_point/Codebase Combiner.app/Contents/Resources/NOTICE"
 cmp -s "$ROOT_DIR/THIRD_PARTY_NOTICES.md" "$mount_point/Codebase Combiner.app/Contents/Resources/THIRD_PARTY_NOTICES.md"
 source_hash="$(shasum -a 256 "$APP/Contents/MacOS/CodebaseExplorerApp" | awk '{print $1}')"
 mounted_hash="$(shasum -a 256 "$mount_point/Codebase Combiner.app/Contents/MacOS/CodebaseExplorerApp" | awk '{print $1}')"

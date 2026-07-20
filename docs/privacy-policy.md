@@ -38,4 +38,4 @@ The app is a general developer utility and is not directed to children. It does 
 
 ## Changes and contact
 
-Material policy changes will be published in this document with a revised effective date. For privacy questions or support, use the public contact instructions on the [Codebase Combiner support page](support.md).
+Material policy changes will be published in this document with a revised effective date. For privacy questions or support, use the [Codebase Combiner support page](support.md) or email [info@rsitech.ai](mailto:info@rsitech.ai).

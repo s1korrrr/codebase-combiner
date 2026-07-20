@@ -8,9 +8,9 @@ Security fixes are provided for the latest published release. Older releases may
 
 Do not disclose a suspected vulnerability in an issue, discussion, pull request, or other public channel.
 
-GitHub private vulnerability reporting is not currently enabled, so there is no functioning private intake channel yet. Do not place vulnerability details in a public issue. The repository owner must enable private reporting before publication-ready security intake can be claimed; once enabled, use the repository's private advisory form and omit secrets, private source code, and unrelated personal data.
+GitHub private vulnerability reporting is not currently enabled. Send suspected vulnerabilities confidentially to [info@rsitech.ai](mailto:info@rsitech.ai) with “Codebase Combiner security” in the subject. Do not place vulnerability details in a public issue. Omit credentials, private source code, and unrelated personal data; include only the minimum reproduction information needed for investigation.
 
-The maintainer will acknowledge the report, investigate it, and coordinate remediation and disclosure with the reporter. Timing depends on severity and the complexity of a safe fix.
+RSI Tech will acknowledge the report, investigate it, and coordinate remediation and disclosure with the reporter. Timing depends on severity and the complexity of a safe fix.
 
 ## Release security
 

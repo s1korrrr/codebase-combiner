@@ -4,7 +4,7 @@ Current candidate checklist refreshed on 2026-07-18. Generated evidence under
 `dist/developer-id/` is authoritative for the final tagged commit; do not reuse
 hashes or notarization results from an earlier source revision.
 
-- [x] Public MIT-licensed source repository.
+- [x] Public Apache-2.0-licensed source repository with Rafal Sikora copyright notice.
 - [x] Separate Developer ID and Mac App Store packaging lanes.
 - [x] App Sandbox and user-selected read/write entitlements reviewed.
 - [x] Node and Swift unit-test baselines green on the audited pre-release source.
