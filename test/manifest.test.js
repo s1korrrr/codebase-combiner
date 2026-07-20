@@ -5,6 +5,7 @@ const manifest = require('../package.json');
 
 describe('extension manifest', () => {
   it('publishes canonical repository links under the RSI Tech organization', () => {
+    expect(manifest.publisher).to.equal('s1korrrr');
     expect(manifest.repository).to.deep.equal({
       type: 'git',
       url: 'https://github.com/rsitech-ai/codebase-combiner.git',
