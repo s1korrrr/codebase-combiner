@@ -114,10 +114,17 @@ printf 'codesign %s\n' "$*" >> "$CALL_LOG"
 if [[ "$*" == *"--verify"* && "${FAIL_GATE:-}" == codesign-verify ]]; then exit 74; fi
 if [[ "$*" == *"--extract-certificates"* ]]; then
   while [[ $# -gt 0 ]]; do
-    if [[ "$1" == --extract-certificates ]]; then
-      printf 'public certificate fixture\n' > "$2"0
-      exit 0
-    fi
+    case "$1" in
+      --extract-certificates=*)
+        certificate_prefix="${1#*=}"
+        printf 'public certificate fixture\n' > "${certificate_prefix}0"
+        exit 0
+        ;;
+      --extract-certificates)
+        echo "Certificate prefix must use --extract-certificates=<prefix>." >&2
+        exit 75
+        ;;
+    esac
     shift
   done
 elif [[ "$*" == *"-dvvv"* ]]; then

@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$ROOT_DIR/script/disk_image_tools.sh"
+source "$ROOT_DIR/Packaging/DeveloperID/codesign_details.sh"
 DMG_PATH=""
 MANIFEST_PATH=""
 PHASE=""
@@ -120,7 +121,7 @@ signature_fingerprint() {
   local fingerprint
   certificate_dir="$(mktemp -d "${TMPDIR:-/tmp}/codebase-combiner-signature-certificates.XXXXXX")"
   certificate_prefix="$certificate_dir/certificate-"
-  if ! codesign -d --extract-certificates "$certificate_prefix" "$artifact" >/dev/null 2>&1; then
+  if ! codesign -d --extract-certificates="$certificate_prefix" "$artifact" >/dev/null 2>&1; then
     rm -rf "$certificate_dir"
     echo "Unable to extract the public signing certificate from $artifact." >&2
     return 1
@@ -203,7 +204,7 @@ if [[ "$SIGNING_MODE" == developer-id ]]; then
   codesign -dvvv "$MOUNTED_APP" >/dev/null 2> "$app_details"
   grep -F 'Authority=Developer ID Application:' "$app_details" >/dev/null
   grep -F "TeamIdentifier=$TEAM_ID" "$app_details" >/dev/null
-  grep -E '^flags=.*runtime' "$app_details" >/dev/null
+  codesign_details_has_hardened_runtime "$app_details"
   grep -F 'Timestamp=' "$app_details" >/dev/null
   rm -f "$app_details"
 fi
