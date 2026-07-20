@@ -7,13 +7,13 @@ final class AppLinksTests: XCTestCase {
         XCTAssertEqual(AppLinks.supportURL.host, "github.com")
         XCTAssertEqual(
             AppLinks.supportURL.path,
-            "/s1korrrr/codebase-combiner/blob/main/docs/support.md"
+            "/rsitech-ai/codebase-combiner/blob/main/docs/support.md"
         )
         XCTAssertEqual(AppLinks.privacyPolicyURL.scheme, "https")
         XCTAssertEqual(AppLinks.privacyPolicyURL.host, "github.com")
         XCTAssertEqual(
             AppLinks.privacyPolicyURL.path,
-            "/s1korrrr/codebase-combiner/blob/main/docs/privacy-policy.md"
+            "/rsitech-ai/codebase-combiner/blob/main/docs/privacy-policy.md"
         )
         XCTAssertFalse(AppLinks.supportURL.absoluteString.contains("buymeacoffee"))
     }

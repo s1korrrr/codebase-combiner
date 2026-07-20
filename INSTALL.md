@@ -17,7 +17,7 @@ This repo contains two deliverables:
 
 ## Install an official macOS release
 
-After an official release is published, download the DMG and `SHA256SUMS` from the same [GitHub Release](https://github.com/s1korrrr/codebase-combiner/releases). The planned 0.1.0 package is Apple silicon (`arm64`) and declares a macOS 13 deployment target. Runtime support is not considered proven until the direct-distribution checklist contains a successful macOS 13 clean-account smoke.
+After an official release is published, download the DMG and `SHA256SUMS` from the same [GitHub Release](https://github.com/rsitech-ai/codebase-combiner/releases). The planned 0.1.0 package is Apple silicon (`arm64`) and declares a macOS 13 deployment target. Runtime support is not considered proven until the direct-distribution checklist contains a successful macOS 13 clean-account smoke.
 
 Verify the download:
 

@@ -28,6 +28,7 @@ for required in \
   extension/extension.js \
   extension/lib/combiner.js \
   extension/LICENSE.txt \
+  extension/NOTICE \
   extension/node_modules/minimatch/LICENSE \
   extension/node_modules/brace-expansion/LICENSE \
   extension/node_modules/balanced-match/LICENSE.md; do

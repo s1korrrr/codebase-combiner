@@ -3,18 +3,22 @@
   "displayName": "Codebase Combiner",
   "description": "Combine a workspace or folder into a single Markdown or text file with configurable filters.",
   "version": "0.0.2",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "publisher": "s1korrrr",
-  "author": "Rafal Sikora",
+  "author": {
+    "name": "RSI Tech",
+    "email": "info@rsitech.ai",
+    "url": "https://rsitech.ai"
+  },
   "icon": "assets/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/s1korrrr/codebase-combiner.git"
+    "url": "https://github.com/rsitech-ai/codebase-combiner.git"
   },
   "bugs": {
-    "url": "https://github.com/s1korrrr/codebase-combiner/issues"
+    "url": "https://github.com/rsitech-ai/codebase-combiner/issues"
   },
-  "homepage": "https://github.com/s1korrrr/codebase-combiner#readme",
+  "homepage": "https://rsitech.ai",
   "keywords": [
     "codebase",
     "combiner",

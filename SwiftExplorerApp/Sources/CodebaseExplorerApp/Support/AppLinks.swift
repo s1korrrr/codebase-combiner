@@ -3,10 +3,10 @@ import Foundation
 
 enum AppLinks {
     static let supportURL = URL(
-        string: "https://github.com/s1korrrr/codebase-combiner/blob/main/docs/support.md"
+        string: "https://github.com/rsitech-ai/codebase-combiner/blob/main/docs/support.md"
     )!
     static let privacyPolicyURL = URL(
-        string: "https://github.com/s1korrrr/codebase-combiner/blob/main/docs/privacy-policy.md"
+        string: "https://github.com/rsitech-ai/codebase-combiner/blob/main/docs/privacy-policy.md"
     )!
 
     @MainActor

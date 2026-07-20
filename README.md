@@ -1,9 +1,11 @@
 # Codebase Combiner
 
-[![CI](https://github.com/s1korrrr/codebase-combiner/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/s1korrrr/codebase-combiner/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/rsitech-ai/codebase-combiner/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rsitech-ai/codebase-combiner/actions/workflows/ci.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 Codebase Combiner helps you curate files, count tokens, and generate a ready-to-paste prompt from a workspace or folder.
+
+Maintained by [RSI Tech](https://rsitech.ai). Public and confidential project contact: [info@rsitech.ai](mailto:info@rsitech.ai).
 
 This repo ships two deliverables:
 
@@ -31,7 +33,7 @@ See `INSTALL.md` for full setup and run instructions.
 
 ### Prepare for the macOS download
 
-No macOS 0.1.0 release is currently published. When an official build is available, it will be distributed outside the Mac App Store through [GitHub Releases](https://github.com/s1korrrr/codebase-combiner/releases) as a Developer ID-signed, Apple-notarized DMG. The candidate is Apple-silicon-only (`arm64`) and declares a macOS 13 deployment target; runtime verification at that floor remains pending. Intel and universal builds are not provided.
+No macOS 0.1.0 release is currently published. When an official build is available, it will be distributed outside the Mac App Store through [GitHub Releases](https://github.com/rsitech-ai/codebase-combiner/releases) as a Developer ID-signed, Apple-notarized DMG. The candidate is Apple-silicon-only (`arm64`) and declares a macOS 13 deployment target; runtime verification at that floor remains pending. Intel and universal builds are not provided.
 
 Download all assets from the release into one directory and verify them before opening the DMG:
 
@@ -136,4 +138,4 @@ See `SECURITY.md`.
 
 ## License
 
-MIT. See `LICENSE`.
+Apache-2.0. Copyright 2026 Rafal Sikora. See `LICENSE` and `NOTICE`.

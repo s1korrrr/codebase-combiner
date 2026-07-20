@@ -4,6 +4,22 @@ const { describe, it } = require('node:test');
 const manifest = require('../package.json');
 
 describe('extension manifest', () => {
+  it('publishes canonical repository links under the RSI Tech organization', () => {
+    expect(manifest.publisher).to.equal('s1korrrr');
+    expect(manifest.license).to.equal('Apache-2.0');
+    expect(manifest.author).to.deep.equal({
+      name: 'RSI Tech',
+      email: 'info@rsitech.ai',
+      url: 'https://rsitech.ai',
+    });
+    expect(manifest.repository).to.deep.equal({
+      type: 'git',
+      url: 'https://github.com/rsitech-ai/codebase-combiner.git',
+    });
+    expect(manifest.bugs?.url).to.equal('https://github.com/rsitech-ai/codebase-combiner/issues');
+    expect(manifest.homepage).to.equal('https://rsitech.ai');
+  });
+
   it('declares local-file-only virtual workspace support', () => {
     expect(manifest.capabilities?.virtualWorkspaces).to.deep.equal({
       supported: false,

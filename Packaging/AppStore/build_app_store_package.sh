@@ -371,6 +371,7 @@ write_release_manifest() {
   local bundle_binary="$APP_PATH/Contents/MacOS/$EXECUTABLE_NAME"
   local bundled_privacy="$APP_PATH/Contents/Resources/PrivacyInfo.xcprivacy"
   local bundled_license="$APP_PATH/Contents/Resources/LICENSE"
+  local bundled_notice="$APP_PATH/Contents/Resources/NOTICE"
   local package_name=""
   local package_sha256=""
 
@@ -385,6 +386,7 @@ write_release_manifest() {
     "$(shasum -a 256 "$bundle_binary" | awk '{print $1}')" \
     "$(shasum -a 256 "$bundled_privacy" | awk '{print $1}')" \
     "$(shasum -a 256 "$bundled_license" | awk '{print $1}')" \
+    "$(shasum -a 256 "$bundled_notice" | awk '{print $1}')" \
     "$(shasum -a 256 "$SYMBOL_MANIFEST" | awk '{print $1}')" \
     "$package_name" "$package_sha256" <<'PY'
 import json
@@ -393,7 +395,7 @@ import sys
 (
     path, app_name, executable, bundle_identifier, version, build, architecture,
     source_commit, source_state, signing_mode, executable_sha256, privacy_sha256,
-    license_sha256, symbols_sha256, package_name, package_sha256,
+    license_sha256, notice_sha256, symbols_sha256, package_name, package_sha256,
 ) = sys.argv[1:]
 data = {
     "schemaVersion": 1,
@@ -412,6 +414,7 @@ data = {
         "appExecutableSHA256": executable_sha256,
         "privacyManifestSHA256": privacy_sha256,
         "licenseSHA256": license_sha256,
+        "noticeSHA256": notice_sha256,
         "symbolManifestSHA256": symbols_sha256,
         "installerPackage": package_name or None,
         "installerPackageSHA256": package_sha256 or None,
@@ -428,6 +431,7 @@ write_release_checksums() {
     "$APP_NAME.app/Contents/MacOS/$EXECUTABLE_NAME"
     "$APP_NAME.app/Contents/Resources/PrivacyInfo.xcprivacy"
     "$APP_NAME.app/Contents/Resources/LICENSE"
+    "$APP_NAME.app/Contents/Resources/NOTICE"
     "symbols/$MARKETING_VERSION-$BUILD_NUMBER-$ARCHITECTURE/manifest.txt"
     "$(basename "$MANIFEST_PATH")"
   )
@@ -511,6 +515,7 @@ make_icon
 rm -rf "$ICONSET_DIR"
 cp "$PRIVACY_MANIFEST" "$APP_PATH/Contents/Resources/PrivacyInfo.xcprivacy"
 cp "$ROOT_DIR/LICENSE" "$APP_PATH/Contents/Resources/LICENSE"
+cp "$ROOT_DIR/NOTICE" "$APP_PATH/Contents/Resources/NOTICE"
 
 if [[ "$SKIP_SIGNING" -eq 0 ]]; then
   cp "$PROVISIONING_PROFILE" "$APP_PATH/Contents/embedded.provisionprofile"
