@@ -29,7 +29,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Hardened the native scanner against symbolic-link roots, special-file blocking, malformed persisted size values, locale-dependent bounded selection, and silent traversal errors.
-- Declared Apple file-timestamp required-reason APIs, embedded the MIT license in App Store bundles, and added source-bound App Store manifests, checksums, and operation locking.
+- Declared Apple file-timestamp required-reason APIs, embedded the project license and notice in app bundles, and added source-bound App Store manifests, checksums, and operation locking.
 - Made notarization resolve SBOM and symbols from the release manifest, publish flat checksum-verifiable evidence, and fail closed when hosted signing is not provisioned.
 - Prevented concurrent or orphaned E2E hosts from sharing and resetting the same sandbox state.
 - Rebuilt the macOS app as an adaptive three-workarea utility that remains usable at 960×640 and independently hides the workspace sidebar and output inspector.

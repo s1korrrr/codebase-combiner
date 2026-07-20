@@ -276,7 +276,7 @@ document = {
             "name": name,
             "version": version,
             "bom-ref": f"pkg:generic/{bundle_id}@{version}",
-            "licenses": [{"license": {"id": "MIT"}}],
+            "licenses": [{"license": {"id": "Apache-2.0"}}],
             "properties": [
                 {"name": "source.commit", "value": commit},
                 *([{"name": "source.tag", "value": source_tag}] if source_tag else []),
@@ -395,6 +395,7 @@ render_info_plist
 make_icon
 cp "$PRIVACY_MANIFEST" "$APP_PATH/Contents/Resources/PrivacyInfo.xcprivacy"
 cp "$ROOT_DIR/LICENSE" "$APP_PATH/Contents/Resources/LICENSE"
+cp "$ROOT_DIR/NOTICE" "$APP_PATH/Contents/Resources/NOTICE"
 cp "$ROOT_DIR/THIRD_PARTY_NOTICES.md" "$APP_PATH/Contents/Resources/THIRD_PARTY_NOTICES.md"
 
 unexpected_executables="$(find "$APP_PATH/Contents" -type f -perm -111 ! -path "$APP_PATH/Contents/MacOS/$EXECUTABLE_NAME" -print)"

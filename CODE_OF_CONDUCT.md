@@ -20,9 +20,9 @@ Examples of unacceptable behavior include:
 
 ## Reporting and enforcement
 
-If you experience or witness unacceptable behavior, use the maintainer's private contact method listed on their GitHub profile and include “Code of Conduct” in the subject. Do not include unrelated personal data. The maintainer will review the report privately and coordinate any necessary follow-up.
+If you experience or witness unacceptable behavior, email [info@rsitech.ai](mailto:info@rsitech.ai) and include “Codebase Combiner Code of Conduct” in the subject. Do not include unrelated personal data. RSI Tech will review the report privately and coordinate any necessary follow-up.
 
-Maintainers will review and take appropriate action, which may include warnings, temporary bans, or permanent bans from the project spaces.
+RSI Tech maintainers will review and take appropriate action, which may include warnings, temporary bans, or permanent bans from the project spaces.
 
 ## Scope
 

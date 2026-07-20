@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-Codebase Combiner itself is licensed under the MIT License. The native macOS app declares no third-party Swift package dependencies.
+Codebase Combiner itself is licensed under the Apache License 2.0. The native macOS app declares no third-party Swift package dependencies.
 
 The packaged VS Code extension includes these runtime dependencies:
 
