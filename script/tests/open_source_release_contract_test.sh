@@ -12,6 +12,7 @@ required_files=(
   .github/dependabot.yml
   .github/workflows/codeql.yml
   .github/workflows/release.yml
+  Packaging/AppStore/tests/build_app_store_package_contract_test.sh
   script/tests/vsix_inventory_test.sh
 )
 for file in "${required_files[@]}"; do
@@ -77,6 +78,7 @@ grep -F 'cp "$ROOT_DIR/LICENSE" "$APP_PATH/Contents/Resources/LICENSE"' Packagin
 grep -F 'cp "$ROOT_DIR/NOTICE" "$APP_PATH/Contents/Resources/NOTICE"' Packaging/AppStore/build_app_store_package.sh >/dev/null
 grep -F 'cp "$ROOT_DIR/NOTICE" "$APP_PATH/Contents/Resources/NOTICE"' Packaging/DeveloperID/build_release.sh >/dev/null
 grep -F '"$APP_NAME.app/Contents/Resources/NOTICE"' Packaging/AppStore/build_app_store_package.sh >/dev/null
+grep -F 'Packaging/AppStore/tests/build_app_store_package_contract_test.sh' .github/workflows/ci.yml >/dev/null
 grep -F 'release-manifest.json' Packaging/AppStore/build_app_store_package.sh >/dev/null
 grep -F 'SHA256SUMS' Packaging/AppStore/build_app_store_package.sh >/dev/null
 grep -F '.app-store-operation.lock' Packaging/AppStore/build_app_store_package.sh >/dev/null

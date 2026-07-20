@@ -28,7 +28,7 @@ Output:
 - `dist/app-store/CodebaseCombiner-AppStore-summary.txt`
 - `dist/app-store/symbols/0.1.0-1-arm64/` with a UUID-checked dSYM and SHA-256 manifest
 - `dist/app-store/release-manifest.json` with source, product, signing-mode, and artifact identities
-- `dist/app-store/SHA256SUMS` covering the executable, privacy manifest, bundled license, symbols manifest, release manifest, and signed installer when present
+- `dist/app-store/SHA256SUMS` covering the executable, privacy manifest, bundled license and NOTICE, symbols manifest, release manifest, and signed installer when present
 
 ## App Store signing
 

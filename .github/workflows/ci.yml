@@ -90,4 +90,4 @@ jobs:
           plutil -lint Packaging/AppStore/AppStore.entitlements
           plutil -lint Packaging/AppStore/Info.plist.in
           plutil -lint Packaging/AppStore/PrivacyInfo.xcprivacy
-          Packaging/AppStore/build_app_store_package.sh --skip-signing
+          Packaging/AppStore/tests/build_app_store_package_contract_test.sh
