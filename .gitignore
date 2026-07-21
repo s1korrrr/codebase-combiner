@@ -1,5 +1,8 @@
 .DS_Store
 .vscode/
+.cursor/
+.codex/
+.agents/
 node_modules/
 SwiftExplorerApp/.build/
 *.vsix
@@ -12,6 +15,8 @@ AGENTS.md
 PLAN.md
 TODO.md
 MEMORY.md
+SOUL.md
+USER.md
 .worktrees/
 .superpowers/
 

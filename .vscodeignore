@@ -1,6 +1,8 @@
 .github/**
 .vscode/**
+.cursor/**
 .codex/**
+.agents/**
 .superpowers/**
 .worktrees/**
 Packaging/**

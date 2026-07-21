@@ -24,7 +24,6 @@ All notable changes to this project will be documented in this file.
 - Structured scan outcomes and skipped-file summaries.
 - Typed scan and persistence retry state with visible recovery controls.
 - An isolated sandboxed E2E host with synthetic fixtures, exact-PID ownership, deterministic window sizing, and scoped cleanup.
-- A single current interaction, performance, security, packaging, and release audit under `docs/audit/`.
 
 ### Changed
 
