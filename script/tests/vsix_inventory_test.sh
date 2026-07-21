@@ -35,7 +35,7 @@ for required in \
   grep -Fx "$required" <<< "$listing" >/dev/null || { echo "VSIX is missing required file: $required" >&2; exit 1; }
 done
 
-if grep -E '(^|/)(\.git|\.github|\.worktrees|\.tap|test|tests|coverage)(/|$)|(^|/)eslint[.]config[.]cjs$|\.(p12|p8|key|pem|dmg|pkg|map|d\.ts)$' <<< "$listing"; then
+if grep -E '(^|/)(\.git|\.github|\.cursor|\.codex|\.agents|\.worktrees|\.tap|test|tests|coverage)(/|$)|(^|/)eslint[.]config[.]cjs$|\.(p12|p8|key|pem|dmg|pkg|map|d\.ts)$' <<< "$listing"; then
   echo "VSIX contains repository, test, secret, release, source-map, or declaration files." >&2
   exit 1
 fi

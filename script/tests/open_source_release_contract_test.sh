@@ -159,6 +159,9 @@ grep -F 'node_modules/**/.github/**' .vscodeignore >/dev/null
 grep -F 'node_modules/**/*.map' .vscodeignore >/dev/null
 grep -F 'node_modules/**/*.d.ts' .vscodeignore >/dev/null
 grep -F '.worktrees/**' .vscodeignore >/dev/null
+grep -F '.cursor/**' .vscodeignore >/dev/null
+grep -F '.codex/**' .vscodeignore >/dev/null
+grep -F '.agents/**' .vscodeignore >/dev/null
 
 expected_vsix="$ROOT_DIR/codebase-combiner-$(node -p 'require("./package.json").version').vsix"
 test -f "$expected_vsix"
